@@ -1,0 +1,17 @@
+
+============================================================
+📊 REPORTE DE INSERCIÓN N0
+============================================================
+Total archivos procesados: 3
+
+❌ ARCHIVOS CON ERRORES:
+  - N0_UNKNOWN_20210228_211039.json:
+    • Error procesando archivo: 'N0SemiFlattener' object has no attribute 'validate_n0_structure'
+  - N0_ES0021000005178445GS_20240916_211210.json:
+    • Error procesando archivo: 'N0SemiFlattener' object has no attribute 'validate_n0_structure'
+  - N0_TEST_PIPELINE_20250906_170940.json:
+    • Error procesando archivo: 'N0SemiFlattener' object has no attribute 'validate_n0_structure'
+
+⏱️ Tiempo total: 0.00 segundos
+📝 Total registros insertados: 0
+============================================================

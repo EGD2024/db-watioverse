@@ -1,0 +1,13 @@
+
+============================================================
+📊 REPORTE DE INSERCIÓN N0
+============================================================
+Total archivos procesados: 3
+✅ ARCHIVOS PROCESADOS EXITOSAMENTE:
+  - N0_UNKNOWN_20210228_211039.json: 10 tablas (0.00s)
+  - N0_ES0021000005178445GS_20240916_211210.json: 10 tablas (0.00s)
+  - N0_TEST_PIPELINE_20250906_170940.json: 10 tablas (0.00s)
+
+⏱️ Tiempo total: 0.00 segundos
+📝 Total registros insertados: 30
+============================================================

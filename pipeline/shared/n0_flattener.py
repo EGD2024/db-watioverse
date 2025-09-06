@@ -279,7 +279,7 @@ class N0SemiFlattener:
             True si la estructura es válida
         """
         required_sections = [
-            'client', 'contract', 'invoice', 'consumo_energia'
+            'client', 'contract', 'invoice', 'energy_consumption'
         ]
         
         found_sections = 0
@@ -290,7 +290,7 @@ class N0SemiFlattener:
             else:
                 logger.warning(f"⚠️ Sección '{section}' no encontrada")
         
-        is_valid = found_sections >= len(required_sections) * 0.75  # Al menos 75% de secciones
+        is_valid = found_sections >= len(required_sections) * 0.99  # Al menos 99% de secciones
         
         if is_valid:
             logger.info(f"✅ Estructura N0 semi-desanidada válida: {found_sections}/{len(required_sections)} secciones")

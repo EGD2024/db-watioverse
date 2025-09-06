@@ -80,19 +80,60 @@ class N1Inserter:
             raise
     
     def extraer_valor_seguro(self, datos: dict, campo: str, valor_defecto: Any = None) -> Any:
-        """Extrae valor de un diccionario de forma segura."""
+        """Extrae valor de un diccionario con notación punto."""
         try:
-            return datos.get(campo, valor_defecto)
+            if '.' in campo:
+                # Navegar por campos anidados usando notación punto
+                partes = campo.split('.')
+                valor = datos
+                for parte in partes:
+                    if isinstance(valor, dict):
+                        valor = valor.get(parte)
+                    else:
+                        return valor_defecto
+                resultado = valor if valor is not None else valor_defecto
+            else:
+                resultado = datos.get(campo, valor_defecto)
+            
+            # Limpiar CUPS eliminando espacios para cumplir límite de 22 caracteres
+            if isinstance(resultado, str) and ('ES' in resultado and len(resultado) > 22):
+                resultado = resultado.replace(' ', '')
+            
+            return resultado
         except Exception as e:
             logger.debug(f"Error extrayendo {campo}: {e}")
             return valor_defecto
     
-    def mapear_datos_documents(self, datos_json: dict) -> Dict[str, Any]:
+    def _convertir_fecha(self, fecha_str: str) -> str:
+        """Convierte string de fecha a formato PostgreSQL (YYYY-MM-DD)."""
+        if not fecha_str:
+            return None
+        try:
+            # Si ya está en formato YYYY-MM-DD, devolverla
+            if isinstance(fecha_str, str) and len(fecha_str) >= 8:
+                if '/' in fecha_str:
+                    # Convertir DD/MM/YYYY a YYYY-MM-DD
+                    partes = fecha_str.split('/')
+                    if len(partes) == 3:
+                        dia, mes, año = partes
+                        return f"{año}-{mes.zfill(2)}-{dia.zfill(2)}"
+                elif '-' in fecha_str and fecha_str.count('-') == 2:
+                    # Ya está en formato correcto
+                    return fecha_str
+            return None
+        except Exception:
+            return None
+    
+    def mapear_datos_documents(self, datos_json: dict, archivo_nombre: str = None) -> Dict[str, Any]:
         """Mapea datos para tabla documents (maestra)."""
-        # Extraer datos de las secciones correctas
-        cups = self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad')
+        # Extraer CUPS desde múltiples ubicaciones posibles
+        cups = (self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'contract_2x3.cups_electricidad') or  
+               self.extraer_valor_seguro(datos_json, 'cups'))
+        
         cliente = self.extraer_valor_seguro(datos_json, 'client.nombre_cliente')
-        nif = self.extraer_valor_seguro(datos_json, 'client.nif_titular_value')
+        nif = (self.extraer_valor_seguro(datos_json, 'client.nif_titular.value') or
+              self.extraer_valor_seguro(datos_json, 'client.nif_titular_value'))
         
         # Construir dirección completa a partir de campos aplanados
         sp_data = self.extraer_valor_seguro(datos_json, 'supply_point', {})
@@ -107,6 +148,7 @@ class N1Inserter:
         
         return {
             'cups': cups,
+            'filename': archivo_nombre or 'unknown',
             'cliente': cliente,
             'direccion': direccion,
             'nif': nif,
@@ -116,35 +158,52 @@ class N1Inserter:
     
     def mapear_datos_metadata(self, datos_json: dict) -> Dict[str, Any]:
         """Mapea datos para tabla metadata (control)."""
-        cups = self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad')
+        cups = (self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'contract_2x3.cups_electricidad') or  
+               self.extraer_valor_seguro(datos_json, 'cups'))
         metadata_json = self.extraer_valor_seguro(datos_json, 'metadata', {})
         
         return {
             'cups': cups,
             'extraction_date': self.extraer_valor_seguro(metadata_json, 'extraction_timestamp'),
-            'extraction_method': self.extraer_valor_seguro(metadata_json, 'extraction_method'),
+            'extraction_method': self.extraer_valor_seguro(metadata_json, 'extraction_method'), 
             'confidence_score': self.extraer_valor_seguro(metadata_json, 'processing_metrics.extraction_confidence'),
-            'file_size_bytes': self.extraer_valor_seguro(metadata_json, 'text_length'),
-            'pages_processed': None # Este dato no está disponible en el JSON N0
+            'file_size_bytes': self.extraer_valor_seguro(metadata_json, 'text_length')
         }
     
     def mapear_datos_client(self, datos_json: dict) -> Dict[str, Any]:
         """Mapea datos del cliente desde JSON a estructura BD."""
-        # Lógica replicada de N0Inserter
+        cups = (self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'contract_2x3.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'cups'))
+        
         client_data = self.extraer_valor_seguro(datos_json, 'client', {})
+        nif_data = self.extraer_valor_seguro(client_data, 'nif_titular', {})
+        
         return {
+            'cups': cups,
             'nombre_cliente': self.extraer_valor_seguro(client_data, 'nombre_cliente'),
-            'nif_titular_value': self.extraer_valor_seguro(client_data, 'nif_titular_value'),
-            'nif_titular_confidence': self.extraer_valor_seguro(client_data, 'nif_titular_confidence'),
-            'nif_titular_pattern': self.extraer_valor_seguro(client_data, 'nif_titular_pattern'),
-            'nif_titular_source': self.extraer_valor_seguro(client_data, 'nif_titular_source')
+            'nif_titular_value': (self.extraer_valor_seguro(nif_data, 'value') or 
+                                self.extraer_valor_seguro(client_data, 'nif_titular_value')),
+            'nif_titular_confidence': (self.extraer_valor_seguro(nif_data, 'confidence') or
+                                     self.extraer_valor_seguro(client_data, 'nif_titular_confidence')),
+            'nif_titular_pattern': (self.extraer_valor_seguro(nif_data, 'pattern') or
+                                  self.extraer_valor_seguro(client_data, 'nif_titular_pattern')),
+            'nif_titular_source': (self.extraer_valor_seguro(nif_data, 'source') or
+                                 self.extraer_valor_seguro(client_data, 'nif_titular_source'))
         }
     
     def mapear_datos_contract(self, datos_json: dict) -> Dict[str, Any]:
         """Mapea datos del contrato desde JSON a estructura BD."""
-        # Lógica replicada de N0Inserter
-        contract_data = self.extraer_valor_seguro(datos_json, 'contract', {})
+        cups = (self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'contract_2x3.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'cups'))
+        
+        # Probar múltiples ubicaciones para contract
+        contract_data = (self.extraer_valor_seguro(datos_json, 'contract', {}) or 
+                        self.extraer_valor_seguro(datos_json, 'contract_2x3', {}))
         return {
+            'cups': cups,
             'comercializadora': self.extraer_valor_seguro(contract_data, 'comercializadora'),
             'numero_contrato_comercializadora': self.extraer_valor_seguro(contract_data, 'numero_contrato_comercializadora'),
             'fecha_inicio_contrato': self._convertir_fecha(self.extraer_valor_seguro(contract_data, 'fecha_inicio_contrato')),
@@ -159,12 +218,21 @@ class N1Inserter:
             'potencia_contratada_p3': self.extraer_valor_seguro(contract_data, 'potencia_contratada_p3'),
             'potencia_contratada_p4': self.extraer_valor_seguro(contract_data, 'potencia_contratada_p4'),
             'potencia_contratada_p5': self.extraer_valor_seguro(contract_data, 'potencia_contratada_p5'),
-            'potencia_contratada_p6': self.extraer_valor_seguro(contract_data, 'potencia_contratada_p6')
+            'potencia_contratada_p6': self.extraer_valor_seguro(contract_data, 'potencia_contratada_p6'),
+            'precio_unitario_potencia_p1': self.extraer_valor_seguro(contract_data, 'precio_unitario_potencia_p1'),
+            'precio_unitario_potencia_p2': self.extraer_valor_seguro(contract_data, 'precio_unitario_potencia_p2'),
+            'precio_unitario_potencia_p3': self.extraer_valor_seguro(contract_data, 'precio_unitario_potencia_p3'),
+            'precio_unitario_potencia_p4': self.extraer_valor_seguro(contract_data, 'precio_unitario_potencia_p4'),
+            'precio_unitario_potencia_p5': self.extraer_valor_seguro(contract_data, 'precio_unitario_potencia_p5'),
+            'precio_unitario_potencia_p6': self.extraer_valor_seguro(contract_data, 'precio_unitario_potencia_p6'),
+            'tarifa_acceso': self.extraer_valor_seguro(contract_data, 'tarifa_acceso')
         }
     
     def mapear_datos_energy_consumption(self, datos_json: dict) -> Dict[str, Any]:
         """Mapea datos para la tabla normalizada energy_consumption."""
-        cups = self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad')
+        cups = (self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'contract_2x3.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'cups'))
         invoice_data = self.extraer_valor_seguro(datos_json, 'invoice', {})
         
         # Calcular consumo total sumando todos los períodos
@@ -181,15 +249,59 @@ class N1Inserter:
         }
 
     def mapear_datos_invoice(self, datos_json: dict) -> Dict[str, Any]:
-        """Mapea datos para tabla invoice."""
-        cups = self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad')
+        """Mapea datos completos para tabla invoice."""
+        cups = (self.extraer_valor_seguro(datos_json, 'contract.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'contract_2x3.cups_electricidad') or
+               self.extraer_valor_seguro(datos_json, 'cups'))
         invoice_data = self.extraer_valor_seguro(datos_json, 'invoice', {})
-        energy_data = self.extraer_valor_seguro(datos_json, 'energy_consumption', {})
+        
         return {
             'cups': cups,
-            'fecha_emision': self.extraer_valor_seguro(invoice_data, 'fecha_emision'),
-            'consumo_facturado_kwh': self.extraer_valor_seguro(energy_data, 'consumo_facturado_kwh'),
-            'importe_total': self.extraer_valor_seguro(invoice_data, 'total_a_pagar')
+            'numero_factura': self.extraer_valor_seguro(invoice_data, 'numero_factura'),
+            'fecha_emision': self._convertir_fecha(self.extraer_valor_seguro(invoice_data, 'fecha_emision')),
+            'fecha_factura': self._convertir_fecha(self.extraer_valor_seguro(invoice_data, 'fecha_factura')),
+            'fecha_inicio_periodo': self._convertir_fecha(self.extraer_valor_seguro(invoice_data, 'fecha_inicio_periodo')),
+            'fecha_fin_periodo': self._convertir_fecha(self.extraer_valor_seguro(invoice_data, 'fecha_fin_periodo')),
+            'periodo_facturacion_inicio': self._convertir_fecha(self.extraer_valor_seguro(invoice_data, 'periodo_facturacion_inicio')),
+            'periodo_facturacion_fin': self._convertir_fecha(self.extraer_valor_seguro(invoice_data, 'periodo_facturacion_fin')),
+            'total_a_pagar': self.extraer_valor_seguro(invoice_data, 'total_a_pagar'),
+            'dias_periodo_facturado': self.extraer_valor_seguro(invoice_data, 'dias_periodo_facturado'),
+            'año': self.extraer_valor_seguro(invoice_data, 'año'),
+            # Consumos por periodo
+            'consumo_kwh_p1': self.extraer_valor_seguro(invoice_data, 'consumo_kwh_p1'),
+            'consumo_kwh_p2': self.extraer_valor_seguro(invoice_data, 'consumo_kwh_p2'),
+            'consumo_kwh_p3': self.extraer_valor_seguro(invoice_data, 'consumo_kwh_p3'),
+            'consumo_kwh_p4': self.extraer_valor_seguro(invoice_data, 'consumo_kwh_p4'),
+            'consumo_kwh_p5': self.extraer_valor_seguro(invoice_data, 'consumo_kwh_p5'),
+            'consumo_kwh_p6': self.extraer_valor_seguro(invoice_data, 'consumo_kwh_p6'),
+            # Costes por periodo
+            'coste_energia_p1': self.extraer_valor_seguro(invoice_data, 'coste_energia_p1'),
+            'coste_energia_p2': self.extraer_valor_seguro(invoice_data, 'coste_energia_p2'),
+            'coste_energia_p3': self.extraer_valor_seguro(invoice_data, 'coste_energia_p3'),
+            'coste_energia_p4': self.extraer_valor_seguro(invoice_data, 'coste_energia_p4'),
+            'coste_energia_p5': self.extraer_valor_seguro(invoice_data, 'coste_energia_p5'),
+            'coste_energia_p6': self.extraer_valor_seguro(invoice_data, 'coste_energia_p6'),
+            'coste_energia_total': self.extraer_valor_seguro(invoice_data, 'coste_energia_total'),
+            'coste_potencia_total': self.extraer_valor_seguro(invoice_data, 'coste_potencia_total'),
+            # Potencias facturadas
+            'potencia_facturada_p1': self.extraer_valor_seguro(invoice_data, 'potencia_facturada_p1'),
+            'potencia_facturada_p2': self.extraer_valor_seguro(invoice_data, 'potencia_facturada_p2'),
+            'potencia_facturada_p3': self.extraer_valor_seguro(invoice_data, 'potencia_facturada_p3'),
+            'potencia_facturada_p4': self.extraer_valor_seguro(invoice_data, 'potencia_facturada_p4'),
+            'potencia_facturada_p5': self.extraer_valor_seguro(invoice_data, 'potencia_facturada_p5'),
+            'potencia_facturada_p6': self.extraer_valor_seguro(invoice_data, 'potencia_facturada_p6'),
+            # Precios energia
+            'precio_energia_p1': self.extraer_valor_seguro(invoice_data, 'precio_energia_p1'),
+            'precio_energia_p2': self.extraer_valor_seguro(invoice_data, 'precio_energia_p2'),
+            'precio_energia_p3': self.extraer_valor_seguro(invoice_data, 'precio_energia_p3'),
+            'precio_energia_p4': self.extraer_valor_seguro(invoice_data, 'precio_energia_p4'),
+            'precio_energia_p5': self.extraer_valor_seguro(invoice_data, 'precio_energia_p5'),
+            'precio_energia_p6': self.extraer_valor_seguro(invoice_data, 'precio_energia_p6'),
+            # Otros campos importantes
+            'consumo_promedio_diario_kwh': self.extraer_valor_seguro(invoice_data, 'consumo_promedio_diario_kwh'),
+            'coste_promedio_diario_eur': self.extraer_valor_seguro(invoice_data, 'coste_promedio_diario_eur'),
+            'importe_impuesto_electricidad': self.extraer_valor_seguro(invoice_data, 'importe_impuesto_electricidad'),
+            'porcentaje_impuesto_electricidad': self.extraer_valor_seguro(invoice_data, 'porcentaje_impuesto_electricidad')
         }
     
     def mapear_datos_consumption_px(self, datos_json: dict, periodo: int) -> Dict[str, Any]:
@@ -283,13 +395,8 @@ class N1Inserter:
             placeholders = ', '.join(['%s'] * len(campos))
             campos_str = ', '.join(campos)
             
-            # UPSERT con ON CONFLICT
-            if 'cups' in campos:
-                # Tablas con CUPS como clave primaria
-                update_fields = [f'{campo} = EXCLUDED.{campo}' for campo in campos if campo != 'cups']
-                conflict_clause = f"ON CONFLICT (cups) DO UPDATE SET {', '.join(update_fields)}" if update_fields else "ON CONFLICT (cups) DO NOTHING"
-            else:
-                conflict_clause = "ON CONFLICT DO NOTHING"
+            # Usar UPSERT para evitar errores de duplicado (misma lógica que N0)
+            conflict_clause = "ON CONFLICT DO NOTHING"
             
             query = f"""INSERT INTO {tabla} ({campos_str}) 
                          VALUES ({placeholders})
@@ -308,6 +415,7 @@ class N1Inserter:
             logger.error(f"  ❌ Error insertando en tabla N1 '{tabla}': {e}")
             return False
     
+    def procesar_archivo_json(self, archivo_path: Path) -> InsercionN1Result:
         """Procesa un archivo JSON N1 individual."""
         inicio_tiempo = datetime.now()
         errores = []
@@ -329,7 +437,7 @@ class N1Inserter:
             tablas_datos = {}
             
             # Tablas principales
-            tablas_datos['documents'] = self.mapear_datos_documents(datos_json)
+            tablas_datos['documents'] = self.mapear_datos_documents(datos_json, archivo_path.name)
             tablas_datos['metadata'] = self.mapear_datos_metadata(datos_json)
             tablas_datos['client'] = self.mapear_datos_client(datos_json)
             tablas_datos['contract'] = self.mapear_datos_contract(datos_json)

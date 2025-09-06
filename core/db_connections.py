@@ -110,82 +110,73 @@ class DatabaseManager:
             'memoria': {**self.base_config, 'database': f"db_{os.getenv('DB_MEMORIA', 'memoria')}"},
         }
         
-        self._init_connection_pools()
+        # NO inicializar pools automáticamente - usar inicialización bajo demanda
+        # self._init_connection_pools()
 
-    def _init_connection_pools(self):
+    def _init_specific_pool(self, db_name: str):
         """
-        Inicializa pools de conexiones para cada base de datos.
-        NO hay fallback - si falla una conexión crítica, lanza excepción.
+        Inicializa pool de conexión para una BD específica bajo demanda.
         """
-        # Bases de datos críticas que DEBEN existir
-        critical_dbs = ['N0', 'N1', 'eSCORE_pesos', 'eSCORE_def', 'eSCORE_master', 
-                       'eSCORE_contx', 'eSCORE_watiodat']
+        if db_name in self.connection_pools:
+            return  # Ya existe
+            
+        if db_name not in self.db_configs:
+            raise ValueError(f"❌ BD '{db_name}' no configurada")
+            
+        config = self.db_configs[db_name]
         
-        for db_name, config in self.db_configs.items():
-            try:
-                # Tamaño del pool según tipo de BD - REDUCIDOS para evitar "too many clients"
-                if 'eSCORE' in db_name:
-                    min_conn, max_conn = 1, 5   # eSCORE: reducido
-                elif db_name in ['N0', 'N1', 'N2']:
-                    min_conn, max_conn = 1, 3   # Pipeline: reducido
-                else:
-                    min_conn, max_conn = 1, 2   # Auxiliares: mínimo
-                
-                self.connection_pools[db_name] = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=min_conn,
-                    maxconn=max_conn,
-                    **config
-                )
-                logger.info(f"✅ Pool creado para '{db_name}' ({min_conn}-{max_conn} conexiones)")
-                
-            except psycopg2.Error as e:
-                if db_name in critical_dbs:
-                    # Base de datos crítica - NO hay fallback
-                    error_msg = f"❌ ERROR CRÍTICO: No se pudo conectar a '{db_name}': {e}"
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
-                else:
-                    # Base de datos no crítica - solo warning
-                    logger.warning(f"⚠️ No se pudo conectar a '{db_name}' (no crítica): {e}")
-                    self.connection_pools[db_name] = None
+        try:
+            # Tamaño mínimo del pool para eficiencia
+            min_conn, max_conn = 1, 2  # Mínimo necesario
+            
+            self.connection_pools[db_name] = psycopg2.pool.ThreadedConnectionPool(
+                minconn=min_conn,
+                maxconn=max_conn,
+                **config
+            )
+            logger.info(f"✅ Pool creado para '{db_name}' ({min_conn}-{max_conn} conexiones)")
+            
+        except psycopg2.Error as e:
+            error_msg = f"❌ ERROR: No se pudo conectar a '{db_name}': {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
     def get_connection(self, db_name: str) -> psycopg2.extensions.connection:
         """
         Obtiene una conexión del pool de la base de datos especificada.
+        Inicializa el pool bajo demanda si no existe.
         
         Args:
             db_name: Nombre de la base de datos (ver lista en db_configs)
             
         Returns:
             Conexión PostgreSQL del pool
-            
-        Raises:
-            KeyError: Si el nombre de DB no es válido
-            RuntimeError: Si no hay conexión disponible (NO HAY FALLBACK)
-        """
-        if db_name not in self.db_configs:
-            raise KeyError(f"Base de datos '{db_name}' no configurada. Disponibles: {list(self.db_configs.keys())}")
         
-        if db_name not in self.connection_pools or self.connection_pools[db_name] is None:
-            raise RuntimeError(f"Pool de conexiones no disponible para '{db_name}' - NO HAY FALLBACK")
+        Raises:
+            RuntimeError: Si no se puede obtener conexión
+        """
+        # Inicializar pool bajo demanda
+        if db_name not in self.connection_pools:
+            self._init_specific_pool(db_name)
+        
+        if self.connection_pools[db_name] is None:
+            raise RuntimeError(f"❌ Pool de '{db_name}' no disponible")
         
         try:
-            conn = self.connection_pools[db_name].getconn()
-            if conn:
-                logger.debug(f"Conexión obtenida del pool '{db_name}'")
-                return conn
-            else:
-                raise RuntimeError(f"No hay conexiones disponibles en el pool de '{db_name}'")
-        except Exception as e:
-            logger.error(f"Error obteniendo conexión del pool '{db_name}': {e}")
-            raise
+            connection = self.connection_pools[db_name].getconn()
+            logger.debug(f"🔗 Conexión obtenida para '{db_name}'")
+            return connection
+        except psycopg2.Error as e:
+            error_msg = f"❌ Error obteniendo conexión para '{db_name}': {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
     def return_connection(self, db_name: str, conn: psycopg2.extensions.connection):
         """Devuelve una conexión al pool."""
         if db_name in self.connection_pools and self.connection_pools[db_name]:
             try:
                 self.connection_pools[db_name].putconn(conn)
-                logger.debug(f"Conexión devuelta al pool '{db_name}'")
+                logger.debug(f"🔙 Conexión devuelta al pool '{db_name}'")
             except Exception as e:
                 logger.error(f"Error al devolver conexión al pool '{db_name}': {e}")
                 if conn:

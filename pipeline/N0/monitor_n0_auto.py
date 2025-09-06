@@ -155,7 +155,7 @@ class N0FileHandler(FileSystemEventHandler):
             
             else:
                 # Fallback: usar solo insertador N0
-                resultado = self.inserter.procesar_archivo_json(Path(archivo_path))
+                resultado = self.inserter.procesar_archivo(Path(archivo_path))
                 
                 if resultado.exito:
                     logger.info(f" Procesamiento N0 exitoso: {archivo_name}")
@@ -192,8 +192,9 @@ class N0FileHandler(FileSystemEventHandler):
             'modo': 'PRUEBA' if self.modo_prueba else 'PRODUCCION'
         }
         
-        # Guardar notificación
-        archivo_notif = f"notificacion_pipeline_exito_{timestamp}.json"
+        # Guardar notificación en directorio errors
+        directorio_errors = "/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out/errors"
+        archivo_notif = f"{directorio_errors}/notificacion_pipeline_exito_{timestamp}.json"
         with open(archivo_notif, 'w', encoding='utf-8') as f:
             json.dump(notificacion, f, indent=2, ensure_ascii=False)
         
@@ -213,8 +214,9 @@ class N0FileHandler(FileSystemEventHandler):
             'modo': 'PRUEBA' if self.modo_prueba else 'PRODUCCION'
         }
         
-        # Guardar notificación
-        archivo_notif = f"notificacion_pipeline_error_{timestamp}.json"
+        # Guardar notificación en directorio errors
+        directorio_errors = "/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out/errors"
+        archivo_notif = f"{directorio_errors}/notificacion_pipeline_error_{timestamp}.json"
         with open(archivo_notif, 'w', encoding='utf-8') as f:
             json.dump(notificacion, f, indent=2, ensure_ascii=False)
         
@@ -231,7 +233,7 @@ class N0FileHandler(FileSystemEventHandler):
             inserter_n1 = N1Inserter(modo_prueba=self.modo_prueba)
             
             # Procesar archivo N1
-            resultado_insercion = inserter_n1.procesar_archivo_json(Path(archivo_n1_path))
+            resultado_insercion = inserter_n1.procesar_archivo(Path(archivo_n1_path))
             
             if resultado_insercion.exito:
                 logger.info(f"✅ Inserción N1 exitosa: {Path(archivo_n1_path).name}")
@@ -258,8 +260,9 @@ class N0FileHandler(FileSystemEventHandler):
             'modo': 'PRUEBA' if self.modo_prueba else 'PRODUCCION'
         }
         
-        # Guardar notificación
-        archivo_notif = f"notificacion_n0_exito_{timestamp}.json"
+        # Guardar notificación en directorio errors
+        directorio_errors = "/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out/errors"
+        archivo_notif = f"{directorio_errors}/notificacion_n0_exito_{timestamp}.json"
         with open(archivo_notif, 'w', encoding='utf-8') as f:
             json.dump(notificacion, f, indent=2, ensure_ascii=False)
         
@@ -277,8 +280,9 @@ class N0FileHandler(FileSystemEventHandler):
             'modo': 'PRUEBA' if self.modo_prueba else 'PRODUCCION'
         }
         
-        # Guardar notificación de error
-        archivo_notif = f"notificacion_n0_error_{timestamp}.json"
+        # Guardar notificación de error en directorio errors
+        directorio_errors = "/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out/errors"
+        archivo_notif = f"{directorio_errors}/notificacion_n0_error_{timestamp}.json"
         with open(archivo_notif, 'w', encoding='utf-8') as f:
             json.dump(notificacion, f, indent=2, ensure_ascii=False)
         

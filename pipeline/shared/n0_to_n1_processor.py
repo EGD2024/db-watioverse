@@ -115,7 +115,7 @@ class N0ToN1Processor:
                 logger.info(f"📄 Archivo N1 guardado: {n1_final_path}")
                 
                 # Usar insertador N1 con archivo N1 final
-                n1_insert_result = self.insert_n1.procesar_archivo_json(Path(n1_final_path))
+                n1_insert_result = self.insert_n1.procesar_archivo(Path(n1_final_path))
                 result['n1_insert_success'] = n1_insert_result.exito
                 result['stats']['n1_inserted_records'] = n1_insert_result.registros_insertados
                 
