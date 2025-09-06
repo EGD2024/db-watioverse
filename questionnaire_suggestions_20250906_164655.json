@@ -1,0 +1,17 @@
+{
+  "generated_at": "2025-09-06T16:46:55.720341",
+  "based_on_files": 7,
+  "questions": [
+    {
+      "question": "¿Cuál es el código CUPS de su punto de suministro?",
+      "type": "text",
+      "required": true,
+      "category": "suministro",
+      "validation": "cups_format",
+      "field_name": "cups",
+      "missing_frequency": 1,
+      "missing_percentage": 14.3,
+      "priority": "medium"
+    }
+  ]
+}

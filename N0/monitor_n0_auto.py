@@ -16,9 +16,6 @@ import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Importar el insertador N0
-from insert_N0 import N0Inserter
-
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO,
@@ -29,6 +26,20 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Importar el insertador N0
+from insert_N0 import N0Inserter
+
+# Importar generador N1 para pipeline automático
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'N1'))
+try:
+    from n1_generator import N1Generator
+    N1_DISPONIBLE = True
+    logger.info("✅ Pipeline N1 disponible - se ejecutará automáticamente")
+except ImportError as e:
+    N1_DISPONIBLE = False
+    logger.warning(f"⚠️ Pipeline N1 no disponible: {e}")
+    logger.warning("   El monitor N0 funcionará sin disparar pipeline N1")
 
 class N0FileHandler(FileSystemEventHandler):
     """Manejador de eventos para archivos N0."""
@@ -41,10 +52,22 @@ class N0FileHandler(FileSystemEventHandler):
         self.cooldown_segundos = 5  # Evitar procesamiento múltiple
         self.ultimo_procesamiento: Dict[str, float] = {}
         
+        # Configurar pipeline N1 si está disponible
+        self.pipeline_n1_activo = N1_DISPONIBLE
+        if self.pipeline_n1_activo:
+            try:
+                self.n1_generator = N1Generator()
+                logger.info("🔗 Pipeline N1 configurado correctamente")
+            except Exception as e:
+                logger.error(f"❌ Error configurando pipeline N1: {e}")
+                self.pipeline_n1_activo = False
+        
         # Cargar archivos ya existentes para evitar reprocesamiento
         self._cargar_archivos_existentes()
         
         logger.info(f"🔍 Monitor N0 iniciado - MODO {'PRUEBA' if modo_prueba else 'PRODUCCIÓN'}")
+        if self.pipeline_n1_activo:
+            logger.info("🚀 Pipeline automático N0→N1 ACTIVADO")
     
     def _cargar_archivos_existentes(self):
         """Carga archivos N0 existentes para evitar reprocesarlos."""
@@ -117,6 +140,10 @@ class N0FileHandler(FileSystemEventHandler):
                 # Marcar como procesado
                 self.archivos_procesados.add(archivo_name)
                 
+                # DISPARAR PIPELINE N1 AUTOMÁTICAMENTE
+                if self.pipeline_n1_activo:
+                    self._disparar_pipeline_n1(archivo_path)
+                
                 # Generar notificación
                 self._generar_notificacion_exito(resultado)
                 
@@ -130,6 +157,56 @@ class N0FileHandler(FileSystemEventHandler):
             
         except Exception as e:
             logger.error(f"💥 Error crítico procesando {archivo_name}: {e}")
+    
+    def _disparar_pipeline_n1(self, archivo_path: str):
+        """Dispara automáticamente el pipeline N1 después de procesar N0."""
+        archivo_name = Path(archivo_path).name
+        
+        try:
+            logger.info(f"🔗 DISPARANDO PIPELINE N1 para: {archivo_name}")
+            
+            # Generar N1 desde N0
+            archivo_n1 = self.n1_generator.generate_n1_from_file(archivo_path)
+            
+            if archivo_n1:
+                logger.info(f"✅ Pipeline N1 exitoso: {Path(archivo_n1).name}")
+                logger.info(f"   📊 Enriquecimiento aplicado correctamente")
+                
+                # Disparar inserción N1 automática si está configurada
+                self._disparar_insercion_n1(archivo_n1)
+                
+            else:
+                logger.error(f"❌ Error en pipeline N1 para {archivo_name}")
+                logger.error("   • No se pudo generar archivo N1")
+                        
+        except Exception as e:
+            logger.error(f"💥 Error crítico en pipeline N1 para {archivo_name}: {e}")
+    
+    def _disparar_insercion_n1(self, archivo_n1_path: str):
+        """Dispara inserción automática del archivo N1 generado."""
+        try:
+            # Importar insertador N1
+            sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'N1'))
+            from insert_N1 import N1Inserter
+            
+            # Crear insertador N1 en el mismo modo que N0
+            inserter_n1 = N1Inserter(modo_prueba=self.modo_prueba)
+            
+            # Procesar archivo N1
+            resultado_insercion = inserter_n1.procesar_archivo_json(Path(archivo_n1_path))
+            
+            if resultado_insercion.exito:
+                logger.info(f"✅ Inserción N1 exitosa: {Path(archivo_n1_path).name}")
+                logger.info(f"   📊 {resultado_insercion.registros_insertados} tablas insertadas")
+            else:
+                logger.error(f"❌ Error en inserción N1: {Path(archivo_n1_path).name}")
+                for error in resultado_insercion.errores:
+                    logger.error(f"   • {error}")
+                    
+        except ImportError:
+            logger.warning("⚠️ Insertador N1 no disponible - archivo N1 generado pero no insertado")
+        except Exception as e:
+            logger.error(f"💥 Error en inserción N1: {e}")
     
     def _generar_notificacion_exito(self, resultado):
         """Genera notificación de procesamiento exitoso."""
@@ -208,6 +285,7 @@ class N0FileHandler(FileSystemEventHandler):
         reporte.append(f"📁 Directorio monitoreado: {self.inserter.directorio_data}")
         reporte.append(f"📋 Archivos procesados: {len(self.archivos_procesados)}")
         reporte.append(f"⏱️ Cooldown: {self.cooldown_segundos}s")
+        reporte.append(f"🔗 Pipeline N1: {'ACTIVO' if self.pipeline_n1_activo else 'INACTIVO'}")
         reporte.append("")
         
         if self.archivos_procesados:

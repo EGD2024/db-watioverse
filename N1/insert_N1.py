@@ -1,0 +1,464 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Script de Inserción N1 - Datos Enriquecidos
+Inserta datos JSON N1 enriquecidos en la base de datos N1 con estructura separada
+"""
+
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime
+import logging
+
+# Importar psycopg2 solo si no estamos en modo prueba
+try:
+    import psycopg2
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
+    logging.warning("psycopg2 no disponible - solo modo prueba")
+
+# Añadir directorio shared al path
+sys.path.append(str(Path(__file__).parent.parent / 'shared'))
+from field_mappings import N1_DB_CONFIG, N1_TABLES
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+@dataclass
+class InsercionN1Result:
+    """Resultado de una inserción N1."""
+    archivo: str
+    exito: bool
+    tablas_insertadas: int
+    registros_insertados: int
+    errores: List[str]
+    tiempo_procesamiento: float
+
+class N1Inserter:
+    """Insertador de datos N1 enriquecidos."""
+    
+    def __init__(self, modo_prueba: bool = True):
+        self.modo_prueba = modo_prueba
+        self.resultados = []
+        self.connection = None
+        
+        if not modo_prueba:
+            logger.warning("⚠️ MODO PRODUCCIÓN ACTIVADO - Se insertará en BD N1 real")
+            self._conectar_bd()
+        else:
+            logger.info("✅ MODO PRUEBA ACTIVADO - Solo simulación")
+    
+    def _conectar_bd(self):
+        """Conecta a la base de datos N1."""
+        if not PSYCOPG2_AVAILABLE:
+            logger.error("❌ psycopg2 no disponible - no se puede conectar a BD")
+            raise ImportError("psycopg2 requerido para modo producción")
+        
+        try:
+            self.connection = psycopg2.connect(**N1_DB_CONFIG)
+            logger.info("✅ Conexión BD N1 establecida")
+        except Exception as e:
+            logger.error(f"❌ Error conectando BD N1: {e}")
+            raise
+    
+    def _cerrar_conexion(self):
+        """Cierra la conexión a BD."""
+        if self.connection:
+            self.connection.close()
+            logger.info("🔌 Conexión BD N1 cerrada")
+    
+    def extraer_valor_seguro(self, datos: dict, campo: str, valor_defecto: Any = None) -> Any:
+        """Extrae valor de un diccionario de forma segura."""
+        try:
+            return datos.get(campo, valor_defecto)
+        except Exception as e:
+            logger.debug(f"Error extrayendo {campo}: {e}")
+            return valor_defecto
+    
+    def mapear_datos_documents(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla documents (maestra)."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'cliente': self.extraer_valor_seguro(datos_json, 'cliente'),
+            'direccion': self.extraer_valor_seguro(datos_json, 'direccion'),
+            'nif': self.extraer_valor_seguro(datos_json, 'nif'),
+            'fecha_procesamiento': datetime.now(),
+            'version_pipeline': self.extraer_valor_seguro(datos_json, '_metadata_n1.pipeline_version', '1.0')
+        }
+    
+    def mapear_datos_metadata(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla metadata (control)."""
+        metadata_n1 = self.extraer_valor_seguro(datos_json, '_metadata_n1', {})
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'fecha_generacion': metadata_n1.get('generated_at', datetime.now().isoformat()),
+            'fuente_origen': metadata_n1.get('source', 'N0_to_N1_pipeline'),
+            'campos_totales': metadata_n1.get('fields_count', len(datos_json)),
+            'enriquecimiento_aplicado': metadata_n1.get('enrichment_applied', True),
+            'version_pipeline': metadata_n1.get('pipeline_version', '1.0')
+        }
+    
+    def mapear_datos_client(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla client."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'cliente': self.extraer_valor_seguro(datos_json, 'cliente'),
+            'nif': self.extraer_valor_seguro(datos_json, 'nif'),
+            'direccion': self.extraer_valor_seguro(datos_json, 'direccion')
+        }
+    
+    def mapear_datos_contract(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla contract."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'periodo_facturacion': self.extraer_valor_seguro(datos_json, 'periodo_facturacion'),
+            'fecha_inicio': self.extraer_valor_seguro(datos_json, 'fecha_inicio'),
+            'fecha_fin': self.extraer_valor_seguro(datos_json, 'fecha_fin')
+        }
+    
+    def mapear_datos_invoice(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla invoice."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'fecha_emision': self.extraer_valor_seguro(datos_json, 'fecha_emision'),
+            'consumo_facturado_kwh': self.extraer_valor_seguro(datos_json, 'consumo_facturado_kwh'),
+            'importe_total': self.extraer_valor_seguro(datos_json, 'importe_total')
+        }
+    
+    def mapear_datos_consumption_px(self, datos_json: dict, periodo: int) -> Dict[str, Any]:
+        """Mapea datos para tablas consumption_p1 a consumption_p6."""
+        campo_consumo = f'consumo_facturado_kwh_p{periodo}'
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'periodo': f'P{periodo}',
+            'consumo_kwh': self.extraer_valor_seguro(datos_json, campo_consumo)
+        }
+    
+    def mapear_datos_cost_px(self, datos_json: dict, periodo: int) -> Dict[str, Any]:
+        """Mapea datos para tablas cost_p1 a cost_p6."""
+        campo_coste = f'coste_energia_p{periodo}'
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'periodo': f'P{periodo}',
+            'coste_energia': self.extraer_valor_seguro(datos_json, campo_coste)
+        }
+    
+    def mapear_datos_power_px(self, datos_json: dict, periodo: int) -> Dict[str, Any]:
+        """Mapea datos para tablas power_p1 a power_p6."""
+        campo_potencia = f'potencia_contratada_p{periodo}'
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'periodo': f'P{periodo}',
+            'potencia_contratada': self.extraer_valor_seguro(datos_json, campo_potencia)
+        }
+    
+    def mapear_datos_sustainability_base(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla sustainability_base (datos directos de factura)."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'mix_energetico_renovable_pct': self.extraer_valor_seguro(datos_json, 'mix_energetico_renovable_pct'),
+            'mix_energetico_cogeneracion_pct': self.extraer_valor_seguro(datos_json, 'mix_energetico_cogeneracion_pct'),
+            'mix_energetico_residuos_pct': self.extraer_valor_seguro(datos_json, 'mix_energetico_residuos_pct'),
+            'emisiones_co2_kg_kwh': self.extraer_valor_seguro(datos_json, 'emisiones_co2_kg_kwh'),
+            'residuos_radiactivos_mg_kwh': self.extraer_valor_seguro(datos_json, 'residuos_radiactivos_mg_kwh')
+        }
+    
+    def mapear_datos_sustainability_metrics(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla sustainability_metrics (datos calculados)."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'huella_carbono_kg': self.extraer_valor_seguro(datos_json, 'huella_carbono_kg'),
+            'rating_sostenibilidad': self.extraer_valor_seguro(datos_json, 'rating_sostenibilidad'),
+            'ahorro_potencial_eur': self.extraer_valor_seguro(datos_json, 'ahorro_potencial_eur'),
+            'recomendacion_mejora': self.extraer_valor_seguro(datos_json, 'recomendacion_mejora')
+        }
+    
+    def mapear_datos_analytics(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea datos para tabla analytics (KPIs y enriquecimiento)."""
+        return {
+            'cups': self.extraer_valor_seguro(datos_json, 'cups'),
+            'latitud': self.extraer_valor_seguro(datos_json, 'latitud'),
+            'longitud': self.extraer_valor_seguro(datos_json, 'longitud'),
+            'precipitacion_mm': self.extraer_valor_seguro(datos_json, 'precipitacion_mm'),
+            'temperatura_media_c': self.extraer_valor_seguro(datos_json, 'temperatura_media_c'),
+            'precio_omie_kwh': self.extraer_valor_seguro(datos_json, 'precio_omie_kwh'),
+            'precio_omie_mwh': self.extraer_valor_seguro(datos_json, 'precio_omie_mwh'),
+            'ratio_precio_mercado': self.extraer_valor_seguro(datos_json, 'ratio_precio_mercado'),
+            'eficiencia_energetica': self.extraer_valor_seguro(datos_json, 'eficiencia_energetica'),
+            'coste_kwh_promedio': self.extraer_valor_seguro(datos_json, 'coste_kwh_promedio')
+        }
+    
+    def simular_insercion_tabla(self, tabla: str, datos: Dict[str, Any]) -> bool:
+        """Simula inserción en tabla (modo prueba)."""
+        if self.modo_prueba:
+            logger.info(f"  📝 SIMULANDO inserción en tabla N1 '{tabla}':")
+            campos_no_nulos = {k: v for k, v in datos.items() if v is not None}
+            for campo, valor in campos_no_nulos.items():
+                logger.info(f"    - {campo}: {valor}")
+            logger.info(f"  ✅ Simulación exitosa - {len(campos_no_nulos)} campos")
+            return True
+        else:
+            return self._insertar_real_tabla(tabla, datos)
+    
+    def _insertar_real_tabla(self, tabla: str, datos: Dict[str, Any]) -> bool:
+        """Inserción real en BD N1."""
+        try:
+            # Filtrar campos nulos
+            campos_no_nulos = {k: v for k, v in datos.items() if v is not None}
+            
+            if not campos_no_nulos:
+                logger.warning(f"No hay datos para insertar en tabla {tabla}")
+                return True
+            
+            # Construir query INSERT
+            campos = list(campos_no_nulos.keys())
+            valores = list(campos_no_nulos.values())
+            placeholders = ', '.join(['%s'] * len(campos))
+            
+            query = f"""
+                INSERT INTO {tabla} ({', '.join(campos)})
+                VALUES ({placeholders})
+                ON CONFLICT (cups) DO UPDATE SET
+                {', '.join([f'{campo} = EXCLUDED.{campo}' for campo in campos if campo != 'cups'])}
+            """
+            
+            cursor = self.connection.cursor()
+            cursor.execute(query, valores)
+            self.connection.commit()
+            cursor.close()
+            
+            logger.info(f"✅ Inserción real exitosa en {tabla}: {len(campos_no_nulos)} campos")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error inserción real en {tabla}: {e}")
+            if self.connection:
+                self.connection.rollback()
+            return False
+    
+    def procesar_archivo_json(self, archivo_path: Path) -> InsercionN1Result:
+        """Procesa un archivo JSON N1 individual."""
+        inicio_tiempo = datetime.now()
+        errores = []
+        tablas_insertadas = 0
+        registros_insertados = 0
+        
+        try:
+            logger.info(f"📄 Procesando N1: {archivo_path.name}")
+            
+            # Cargar JSON N1
+            with open(archivo_path, 'r', encoding='utf-8') as f:
+                datos_json = json.load(f)
+            
+            # Verificar que es un JSON N1 válido
+            if '_metadata_n1' not in datos_json:
+                logger.warning(f"Archivo no parece ser JSON N1: {archivo_path.name}")
+            
+            # Mapear datos para todas las tablas N1
+            tablas_datos = {}
+            
+            # Tablas principales
+            tablas_datos['documents'] = self.mapear_datos_documents(datos_json)
+            tablas_datos['metadata'] = self.mapear_datos_metadata(datos_json)
+            tablas_datos['client'] = self.mapear_datos_client(datos_json)
+            tablas_datos['contract'] = self.mapear_datos_contract(datos_json)
+            tablas_datos['invoice'] = self.mapear_datos_invoice(datos_json)
+            
+            # Tablas por períodos (P1-P6)
+            for periodo in range(1, 7):
+                tablas_datos[f'consumption_p{periodo}'] = self.mapear_datos_consumption_px(datos_json, periodo)
+                tablas_datos[f'cost_p{periodo}'] = self.mapear_datos_cost_px(datos_json, periodo)
+                tablas_datos[f'power_p{periodo}'] = self.mapear_datos_power_px(datos_json, periodo)
+            
+            # Tablas de sostenibilidad y analytics
+            tablas_datos['sustainability_base'] = self.mapear_datos_sustainability_base(datos_json)
+            tablas_datos['sustainability_metrics'] = self.mapear_datos_sustainability_metrics(datos_json)
+            tablas_datos['analytics'] = self.mapear_datos_analytics(datos_json)
+            
+            # Insertar en cada tabla
+            for tabla, datos in tablas_datos.items():
+                if self.simular_insercion_tabla(tabla, datos):
+                    tablas_insertadas += 1
+                    registros_insertados += 1
+                else:
+                    errores.append(f"Error insertando en tabla {tabla}")
+            
+            tiempo_procesamiento = (datetime.now() - inicio_tiempo).total_seconds()
+            
+            return InsercionN1Result(
+                archivo=archivo_path.name,
+                exito=len(errores) == 0,
+                tablas_insertadas=tablas_insertadas,
+                registros_insertados=registros_insertados,
+                errores=errores,
+                tiempo_procesamiento=tiempo_procesamiento
+            )
+            
+        except Exception as e:
+            tiempo_procesamiento = (datetime.now() - inicio_tiempo).total_seconds()
+            error_msg = f"Error procesando {archivo_path.name}: {str(e)}"
+            logger.error(error_msg)
+            
+            return InsercionN1Result(
+                archivo=archivo_path.name,
+                exito=False,
+                tablas_insertadas=0,
+                registros_insertados=0,
+                errores=[error_msg],
+                tiempo_procesamiento=tiempo_procesamiento
+            )
+    
+    def procesar_directorio(self, directorio_n1: str, limite_archivos: int = None) -> List[InsercionN1Result]:
+        """Procesa archivos JSON N1 de un directorio."""
+        logger.info(f"🚀 INICIANDO PROCESAMIENTO N1 - MODO {'PRUEBA' if self.modo_prueba else 'PRODUCCIÓN'}")
+        logger.info(f"📁 Directorio: {directorio_n1}")
+        
+        # Buscar archivos JSON N1
+        data_path = Path(directorio_n1)
+        archivos_json = list(data_path.glob("*_N1.json")) + list(data_path.glob("N1_*.json"))
+        
+        logger.info(f"📊 Encontrados {len(archivos_json)} archivos N1")
+        
+        if limite_archivos:
+            archivos_json = archivos_json[:limite_archivos]
+            logger.info(f"🎯 Procesando primeros {len(archivos_json)} archivos")
+        
+        # Procesar cada archivo
+        resultados = []
+        for archivo in archivos_json:
+            resultado = self.procesar_archivo_json(archivo)
+            resultados.append(resultado)
+            self.resultados.append(resultado)
+        
+        return resultados
+    
+    def generar_reporte(self) -> str:
+        """Genera reporte de resultados N1."""
+        if not self.resultados:
+            return "No hay resultados N1 para reportar."
+        
+        exitosos = [r for r in self.resultados if r.exito]
+        fallidos = [r for r in self.resultados if not r.exito]
+        
+        reporte = []
+        reporte.append("=" * 60)
+        reporte.append("📋 REPORTE INSERCIÓN N1 (DATOS ENRIQUECIDOS)")
+        reporte.append("=" * 60)
+        reporte.append(f"📊 Total archivos procesados: {len(self.resultados)}")
+        reporte.append(f"✅ Exitosos: {len(exitosos)}")
+        reporte.append(f"❌ Fallidos: {len(fallidos)}")
+        reporte.append(f"📈 Tasa de éxito: {len(exitosos)/len(self.resultados)*100:.1f}%")
+        reporte.append("")
+        
+        if exitosos:
+            reporte.append("✅ ARCHIVOS N1 PROCESADOS EXITOSAMENTE:")
+            for resultado in exitosos:
+                reporte.append(f"  - {resultado.archivo}: {resultado.tablas_insertadas}/17 tablas ({resultado.tiempo_procesamiento:.2f}s)")
+        
+        if fallidos:
+            reporte.append("")
+            reporte.append("❌ ARCHIVOS N1 CON ERRORES:")
+            for resultado in fallidos:
+                reporte.append(f"  - {resultado.archivo}:")
+                for error in resultado.errores:
+                    reporte.append(f"    • {error}")
+        
+        tiempo_total = sum(r.tiempo_procesamiento for r in self.resultados)
+        registros_total = sum(r.registros_insertados for r in self.resultados)
+        
+        reporte.append("")
+        reporte.append(f"⏱️ Tiempo total: {tiempo_total:.2f} segundos")
+        reporte.append(f"📝 Total registros insertados: {registros_total}")
+        reporte.append(f"🗂️ Tablas N1 objetivo: {len(N1_TABLES)}")
+        reporte.append("=" * 60)
+        
+        return "\n".join(reporte)
+    
+    def __del__(self):
+        """Destructor para cerrar conexión BD."""
+        self._cerrar_conexion()
+
+def insertar_n1_file(n1_json_path: str, modo_prueba: bool = True) -> bool:
+    """
+    Función de conveniencia para insertar un archivo N1
+    
+    Args:
+        n1_json_path: Ruta al archivo JSON N1
+        modo_prueba: Si True, solo simula inserción
+        
+    Returns:
+        True si se insertó exitosamente, False en caso contrario
+    """
+    inserter = N1Inserter(modo_prueba=modo_prueba)
+    resultado = inserter.procesar_archivo_json(Path(n1_json_path))
+    return resultado.exito
+
+if __name__ == "__main__":
+    # Test con datos N1 simulados
+    print("🚀 INSERTADOR N1 - MODO PRUEBA")
+    print("=" * 50)
+    
+    # Crear datos N1 de ejemplo
+    sample_n1_data = {
+        "cliente": "EMPRESA EJEMPLO SL",
+        "direccion": "GRAN VIA 28, MADRID",
+        "cups": "ES0031408000000000002JN",
+        "nif": "B12345678",
+        "periodo_facturacion": "2024-08",
+        "fecha_emision": "2024-09-01",
+        "fecha_inicio": "2024-08-01",
+        "fecha_fin": "2024-08-31",
+        "consumo_facturado_kwh": 2500.75,
+        "importe_total": 450.30,
+        "consumo_facturado_kwh_p1": 800.25,
+        "consumo_facturado_kwh_p2": 1200.50,
+        "coste_energia_p1": 120.15,
+        "coste_energia_p2": 180.20,
+        "potencia_contratada_p1": 5.5,
+        "potencia_contratada_p2": 5.5,
+        "mix_energetico_renovable_pct": 45.2,
+        "emisiones_co2_kg_kwh": 0.25,
+        "latitud": 40.4168,
+        "longitud": -3.7038,
+        "coste_kwh_promedio": 0.180066,
+        "rating_sostenibilidad": "C",
+        "huella_carbono_kg": 625.19,
+        "_metadata_n1": {
+            "generated_at": "2024-09-06T16:00:00",
+            "pipeline_version": "1.0",
+            "source": "N0_to_N1_pipeline",
+            "fields_count": 23,
+            "enrichment_applied": True
+        }
+    }
+    
+    # Crear archivo temporal para test
+    test_file = Path("test_n1_sample.json")
+    with open(test_file, 'w', encoding='utf-8') as f:
+        json.dump(sample_n1_data, f, indent=2, ensure_ascii=False)
+    
+    # Crear insertador y procesar
+    inserter = N1Inserter(modo_prueba=True)
+    resultado = inserter.procesar_archivo_json(test_file)
+    
+    # Mostrar resultado
+    print(f"✅ Test inserción N1: {'ÉXITO' if resultado.exito else 'ERROR'}")
+    print(f"📊 Tablas procesadas: {resultado.tablas_insertadas}/17")
+    print(f"⏱️ Tiempo: {resultado.tiempo_procesamiento:.2f}s")
+    
+    if resultado.errores:
+        print("❌ Errores:")
+        for error in resultado.errores:
+            print(f"  - {error}")
+    
+    # Limpiar archivo temporal
+    test_file.unlink()
+    
+    print("\n=== Test completado ===")
