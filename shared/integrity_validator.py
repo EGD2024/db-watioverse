@@ -142,6 +142,18 @@ class IntegrityValidator:
             else:
                 logger.info("✅ Validación exitosa: integridad completa")
             
+            # Generar cuestionario automáticamente si hay campos críticos faltantes
+            if critical_issues:
+                try:
+                    from .questionnaire_manager import QuestionnaireManager
+                    questionnaire_manager = QuestionnaireManager()
+                    session_token = questionnaire_manager.generate_questionnaire_from_validation(result)
+                    if session_token:
+                        result['questionnaire_session'] = session_token
+                        logger.info(f"🎯 Cuestionario generado automáticamente: {session_token}")
+                except Exception as qe:
+                    logger.warning(f"No se pudo generar cuestionario automático: {qe}")
+            
             return result
             
         except Exception as e:

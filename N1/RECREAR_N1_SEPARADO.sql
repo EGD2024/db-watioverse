@@ -482,9 +482,92 @@ FROM pg_tables
 WHERE schemaname = 'public'
 ORDER BY tablename;
 
+-- =====================================================
+-- SISTEMA DE CUESTIONARIOS DINÁMICOS
+-- Gestión de campos faltantes y completitud de datos
+-- =====================================================
+
+-- Tabla de preguntas del cuestionario
+CREATE TABLE questionnaire_questions (
+    id SERIAL PRIMARY KEY,
+    field_name VARCHAR(100) NOT NULL,
+    question_text TEXT NOT NULL,
+    field_type VARCHAR(50) NOT NULL, -- 'text', 'number', 'select', 'boolean'
+    is_critical BOOLEAN DEFAULT FALSE,
+    validation_rules JSONB,
+    help_text TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de condiciones para mostrar preguntas
+CREATE TABLE questionnaire_conditions (
+    id SERIAL PRIMARY KEY,
+    question_id INTEGER REFERENCES questionnaire_questions(id) ON DELETE CASCADE,
+    condition_field VARCHAR(100),
+    condition_operator VARCHAR(20), -- 'equals', 'contains', 'missing', 'exists'
+    condition_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de respuestas del cuestionario
+CREATE TABLE questionnaire_responses (
+    id SERIAL PRIMARY KEY,
+    document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+    question_id INTEGER REFERENCES questionnaire_questions(id) ON DELETE CASCADE,
+    response_value TEXT,
+    response_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_session VARCHAR(100),
+    is_validated BOOLEAN DEFAULT FALSE,
+    validation_errors JSONB
+);
+
+-- Tabla de sesiones de cuestionario
+CREATE TABLE questionnaire_sessions (
+    id SERIAL PRIMARY KEY,
+    document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+    session_token VARCHAR(100) UNIQUE NOT NULL,
+    cups VARCHAR(22) NOT NULL,
+    missing_fields JSONB NOT NULL,
+    total_questions INTEGER DEFAULT 0,
+    answered_questions INTEGER DEFAULT 0,
+    completion_percentage DECIMAL(5,2) DEFAULT 0.00,
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'expired'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '7 days')
+);
+
+-- Tabla de analíticas de cuestionarios
+CREATE TABLE questionnaire_analytics (
+    id SERIAL PRIMARY KEY,
+    question_id INTEGER REFERENCES questionnaire_questions(id) ON DELETE CASCADE,
+    total_shown INTEGER DEFAULT 0,
+    total_answered INTEGER DEFAULT 0,
+    total_skipped INTEGER DEFAULT 0,
+    avg_response_time_seconds INTEGER DEFAULT 0,
+    most_common_response TEXT,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Índices para optimizar consultas de cuestionarios
+CREATE INDEX idx_questionnaire_responses_document ON questionnaire_responses(document_id);
+CREATE INDEX idx_questionnaire_responses_question ON questionnaire_responses(question_id);
+CREATE INDEX idx_questionnaire_sessions_token ON questionnaire_sessions(session_token);
+CREATE INDEX idx_questionnaire_sessions_cups ON questionnaire_sessions(cups);
+CREATE INDEX idx_questionnaire_sessions_status ON questionnaire_sessions(status);
+CREATE INDEX idx_questionnaire_conditions_question ON questionnaire_conditions(question_id);
+
+-- Insertar preguntas básicas basadas en análisis real
+INSERT INTO questionnaire_questions (field_name, question_text, field_type, is_critical, help_text) VALUES
+('cups', '¿Cuál es el código CUPS de su punto de suministro?', 'text', TRUE, 'El CUPS es un código único de 20-22 caracteres que identifica su punto de suministro eléctrico. Lo puede encontrar en su factura.'),
+('potencia_contratada', '¿Cuál es su potencia contratada en kW?', 'number', TRUE, 'La potencia contratada aparece en su factura eléctrica, normalmente expresada en kW.'),
+('tarifa_acceso', '¿Qué tarifa de acceso tiene contratada?', 'select', FALSE, 'Ejemplos: 2.0TD, 3.0TD, 6.1TD. Esta información aparece en su factura eléctrica.'),
+('tipo_contador', '¿Qué tipo de contador tiene instalado?', 'select', FALSE, 'Indique si tiene contador inteligente (telemedida) o contador convencional.');
+
 -- Mostrar estadísticas finales
 SELECT 
-    'N1 RECREADA EXITOSAMENTE' as status,
+    'N1 CON CUESTIONARIOS CREADA EXITOSAMENTE' as status,
     COUNT(*) as total_tablas
 FROM pg_tables 
 WHERE schemaname = 'public';

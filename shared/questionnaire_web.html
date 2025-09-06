@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuestionario de Completitud de Datos - Energy Green Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1ABC9C 0%, #16A085 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .progress-bar {
+            background: #ecf0f1;
+            height: 8px;
+            margin: 20px 30px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #1ABC9C, #16A085);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .question-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1ABC9C;
+            display: none;
+        }
+        
+        .question-card.active {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .question-title {
+            font-size: 1.3em;
+            color: #2C3E50;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .question-help {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #e8f6f3;
+            border-radius: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #1ABC9C;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1ABC9C, #16A085);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(26, 188, 156, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+        }
+        
+        .completion-message {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        
+        .completion-message.show {
+            display: block;
+        }
+        
+        .completion-icon {
+            font-size: 4em;
+            color: #1ABC9C;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            background: #e74c3c;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1ABC9C;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Completitud de Datos</h1>
+            <p>Ayúdanos a completar la información de tu suministro energético</p>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="content">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Cargando cuestionario...</p>
+            </div>
+            
+            <div class="error-message" id="errorMessage"></div>
+            
+            <div id="questionnaire" style="display: none;">
+                <div id="questionsContainer"></div>
+                
+                <div class="navigation">
+                    <button class="btn btn-secondary" id="prevBtn" onclick="previousQuestion()" style="display: none;">
+                        ← Anterior
+                    </button>
+                    <div>
+                        <span id="questionCounter">1 de 1</span>
+                    </div>
+                    <button class="btn btn-primary" id="nextBtn" onclick="nextQuestion()">
+                        Siguiente →
+                    </button>
+                </div>
+            </div>
+            
+            <div class="completion-message" id="completionMessage">
+                <div class="completion-icon">✅</div>
+                <h2>¡Cuestionario Completado!</h2>
+                <p>Gracias por completar la información. Los datos han sido guardados correctamente.</p>
+                <button class="btn btn-primary" onclick="window.close()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQuestionIndex = 0;
+        let questions = [];
+        let sessionToken = '';
+        let responses = {};
+        
+        // Obtener token de sesión de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        sessionToken = urlParams.get('token');
+        
+        if (!sessionToken) {
+            showError('Token de sesión no proporcionado');
+        } else {
+            loadQuestionnaire();
+        }
+        
+        async function loadQuestionnaire() {
+            try {
+                const response = await fetch(`/api/questionnaire/${sessionToken}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showError(data.error || 'Error cargando cuestionario');
+                    return;
+                }
+                
+                questions = data.data.questions;
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('questionnaire').style.display = 'block';
+                
+                renderQuestions();
+                updateProgress();
+                updateNavigation();
+                
+            } catch (error) {
+                showError('Error de conexión: ' + error.message);
+            }
+        }
+        
+        function renderQuestions() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+            
+            questions.forEach((question, index) => {
+                const questionCard = document.createElement('div');
+                questionCard.className = 'question-card';
+                questionCard.id = `question-${index}`;
+                
+                if (index === 0) {
+                    questionCard.classList.add('active');
+                }
+                
+                let inputHtml = '';
+                if (question.field_type === 'select' && question.options) {
+                    inputHtml = `
+                        <select class="form-control" id="input-${question.field_name}" onchange="saveResponse('${question.field_name}', this.value)">
+                            <option value="">Seleccione una opción</option>
+                            ${question.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                        </select>
+                    `;
+                } else if (question.field_type === 'number') {
+                    inputHtml = `
+                        <input type="number" class="form-control" id="input-${question.field_name}" 
+                               placeholder="Ingrese el valor" step="0.01" 
+                               onchange="saveResponse('${question.field_name}', this.value)">
+                    `;
+                } else {
+                    inputHtml = `
+                        <input type="text" class="form-control" id="input-${question.field_name}" 
+                               placeholder="Ingrese el valor" 
+                               onchange="saveResponse('${question.field_name}', this.value)">
+                    `;
+                }
+                
+                questionCard.innerHTML = `
+                    <div class="question-title">${question.question_text}</div>
+                    <div class="question-help">${question.help_text}</div>
+                    <div class="form-group">
+                        ${inputHtml}
+                    </div>
+                `;
+                
+                container.appendChild(questionCard);
+            });
+        }
+        
+        async function saveResponse(fieldName, value) {
+            if (!value.trim()) return;
+            
+            try {
+                const response = await fetch(`/api/questionnaire/${sessionToken}/response`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        field_name: fieldName,
+                        response_value: value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    responses[fieldName] = value;
+                    updateProgress(data.completion_percentage);
+                    
+                    // Auto-avanzar si está completo
+                    if (data.completion_percentage === 100) {
+                        setTimeout(showCompletion, 1000);
+                    }
+                } else {
+                    showError(data.error || 'Error guardando respuesta');
+                }
+                
+            } catch (error) {
+                showError('Error de conexión: ' + error.message);
+            }
+        }
+        
+        function nextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+                document.getElementById(`question-${currentQuestionIndex}`).classList.remove('active');
+                currentQuestionIndex++;
+                document.getElementById(`question-${currentQuestionIndex}`).classList.add('active');
+                updateNavigation();
+            }
+        }
+        
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                document.getElementById(`question-${currentQuestionIndex}`).classList.remove('active');
+                currentQuestionIndex--;
+                document.getElementById(`question-${currentQuestionIndex}`).classList.add('active');
+                updateNavigation();
+            }
+        }
+        
+        function updateNavigation() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const counter = document.getElementById('questionCounter');
+            
+            prevBtn.style.display = currentQuestionIndex > 0 ? 'block' : 'none';
+            nextBtn.style.display = currentQuestionIndex < questions.length - 1 ? 'block' : 'none';
+            
+            counter.textContent = `${currentQuestionIndex + 1} de ${questions.length}`;
+        }
+        
+        function updateProgress(percentage = null) {
+            if (percentage === null) {
+                percentage = (Object.keys(responses).length / questions.length) * 100;
+            }
+            
+            document.getElementById('progressFill').style.width = percentage + '%';
+        }
+        
+        function showCompletion() {
+            document.getElementById('questionnaire').style.display = 'none';
+            document.getElementById('completionMessage').classList.add('show');
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
