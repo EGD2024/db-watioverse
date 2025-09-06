@@ -1,4 +1,4 @@
-# 🌊 db_watioverse - Ecosistema de Datos Energéticos
+# db_watioverse - Ecosistema de Datos Energéticos
 
 ![Versión](https://img.shields.io/badge/versión-2.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
@@ -14,18 +14,18 @@
 
 ---
 
-## 📑 Tabla de Contenidos
+## Tabla de Contenidos
 
-- [Arquitectura Modular](#-arquitectura-modular)
-- [Organigrama de Bases de Datos](#-organigrama-de-bases-de-datos)
-- [Pipeline de Integración](#-pipeline-de-integración)
-- [Configuración del Entorno](#-configuración-del-entorno)
-- [Flujo de Datos Completo](#-flujo-de-datos-completo)
-- [Componentes del Sistema](#-componentes-del-sistema)
+- [Arquitectura Modular](#arquitectura-modular)
+- [Organigrama de Bases de Datos](#organigrama-de-bases-de-datos)
+- [Pipeline de Integración](#pipeline-de-integración)
+- [Configuración del Entorno](#configuración-del-entorno)
+- [Flujo de Datos Completo](#flujo-de-datos-completo)
+- [Componentes del Sistema](#componentes-del-sistema)
 
 ---
 
-## 🏗️ Arquitectura Modular
+## Arquitectura Modular
 
 El ecosistema `db_watioverse` implementa una arquitectura modular de 4 bases de datos especializadas que separan responsabilidades y optimizan el procesamiento de datos energéticos:
 
@@ -33,15 +33,15 @@ El ecosistema `db_watioverse` implementa una arquitectura modular de 4 bases de 
 
 ```mermaid
 graph TD
-    A[📄 Facturas PDF] --> B[🔄 Motor Extracción]
-    B --> C[📊 JSONs Data_out]
-    C --> D[💾 db_N0 - Datos Brutos]
-    D --> E[⚡ db_N1 - Datos Cliente]
-    E --> F[📋 db_encuesta - Cuestionarios]
-    E --> G[💎 db_enriquecimiento - Cache]
-    F --> H[🎯 eSCORE Motor]
+    A[Facturas PDF] --> B[Motor Extracción]
+    B --> C[JSONs Data_out]
+    C --> D[db_N0 - Datos Brutos]
+    D --> E[db_N1 - Datos Cliente]
+    E --> F[db_encuesta - Cuestionarios]
+    E --> G[db_enriquecimiento - Cache]
+    F --> H[eSCORE Motor]
     G --> H
-    H --> I[📈 Score Energético]
+    H --> I[Score Energético]
     
     style D fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style E fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
@@ -51,7 +51,7 @@ graph TD
     style I fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
-## 🗄️ Organigrama de Bases de Datos
+## Organigrama de Bases de Datos
 
 ### db_N0 - Capa de Datos Brutos
 **Propósito:** Almacenamiento directo de datos extraídos de facturas
@@ -112,7 +112,7 @@ graph TD
 | `enrichment_queue` | Cola de trabajos asíncronos |
 | `enrichment_sources` | Control de APIs externas |
 
-## 🔄 Pipeline de Integración
+## Pipeline de Integración
 
 ### Flujo Principal N0→N1→eSCORE
 
@@ -157,36 +157,36 @@ sequenceDiagram
 | **Cache Hit Rate** | N/A (nuevo) | Objetivo: 80% |
 | **Enriquecimiento Asíncrono** | 30-60 segundos | Objetivo: 95% |
 
-## 🚀 Configuración del Entorno
+## Configuración del Entorno
 
 ### Estructura del Repositorio
 
 ```
 db_watioverse/
-├── N0/                    # 💾 Capa de datos brutos (db_N0)
-│   ├── insert_N0.py      # 📥 Insertador de datos
-│   ├── monitor_n0_auto.py # 🔍 Monitor automático
-│   └── README_N0.md      # 📋 Documentación N0
-├── N1/                   # ⚡ Capa cliente (db_N1)
-│   ├── n1_generator.py   # 🔄 Pipeline N0→N1
-│   ├── insert_N1.py     # 📥 Insertador N1
-│   └── README_N1.md     # 📋 Documentación N1
-├── shared/               # 🔧 Componentes compartidos
-│   ├── field_mappings.py # 🗺️ Mapeos N0→N1
-│   ├── n0_cleaner.py    # 🧹 Limpieza metadatos
-│   ├── enrichment_engine.py # 💎 Motor enriquecimiento
-│   ├── integrity_validator.py # ✅ Validador integridad
-│   └── batch_analysis.py # 📈 Análisis masivo
-├── questionnaires/       # 📋 Sistema encuestas (db_encuesta)
-│   ├── questionnaire_manager.py # 🎯 Gestor dinámico
-│   ├── questionnaire_api.py # 🌐 API REST
-│   └── questionnaire_web/ # 💻 Interfaz web
-├── enrichment/          # 💎 Cache y enriquecimiento (db_enriquecimiento)
-│   ├── cache_manager.py # 📊 Gestor cache
-│   ├── async_enricher.py # ⚡ Enriquecimiento asíncrono
-│   └── api_connectors/ # 🔌 Conectores APIs externas
-├── venv/                # 🐍 Entorno virtual Python
-└── activate_env.sh      # 🚀 Script de activación
+├── N0/                    # Capa de datos brutos (db_N0)
+│   ├── insert_N0.py      # Insertador de datos
+│   ├── monitor_n0_auto.py # Monitor automático
+│   └── README_N0.md      # Documentación N0
+├── N1/                   # Capa cliente (db_N1)
+│   ├── n1_generator.py   # Pipeline N0→N1
+│   ├── insert_N1.py     # Insertador N1
+│   └── README_N1.md     # Documentación N1
+├── shared/               # Componentes compartidos
+│   ├── field_mappings.py # Mapeos N0→N1
+│   ├── n0_cleaner.py    # Limpieza metadatos
+│   ├── enrichment_engine.py # Motor enriquecimiento
+│   ├── integrity_validator.py # Validador integridad
+│   └── batch_analysis.py # Análisis masivo
+├── questionnaires/       # Sistema encuestas (db_encuesta)
+│   ├── questionnaire_manager.py # Gestor dinámico
+│   ├── questionnaire_api.py # API REST
+│   └── questionnaire_web/ # Interfaz web
+├── enrichment/          # Cache y enriquecimiento (db_enriquecimiento)
+│   ├── cache_manager.py # Gestor cache
+│   ├── async_enricher.py # Enriquecimiento asíncrono
+│   └── api_connectors/ # Conectores APIs externas
+├── venv/                # Entorno virtual Python
+└── activate_env.sh      # Script de activación
 ```
 
 ### Activar Entorno Virtual
@@ -208,7 +208,7 @@ source venv/bin/activate
 - **asyncio** - Procesamiento asíncrono
 - **Python 3.8+** - Entorno de ejecución
 
-## 🔄 Flujo de Datos Completo
+## Flujo de Datos Completo
 
 ### Proceso de Transformación Integral
 
@@ -246,7 +246,7 @@ source venv/bin/activate
 - Añadir información de mercado energético
 - Detectar cambios de dirección automáticamente
 
-## ⚙️ Componentes del Sistema
+## Componentes del Sistema
 
 ### Monitoreo y Automatización
 
@@ -299,7 +299,7 @@ export DB_ENCUESTA=db_encuesta
 export DB_ENRIQUECIMIENTO=db_enriquecimiento
 ```
 
-## 📊 Métricas de Calidad Actual
+## Métricas de Calidad Actual
 
 ### Análisis de Datos Reales
 
@@ -324,7 +324,7 @@ Basado en procesamiento de archivos N0 reales del sistema:
 
 ---
 
-## 🔗 Integración con eSCORE
+## Integración con eSCORE
 
 ### Arquitectura Híbrida
 
