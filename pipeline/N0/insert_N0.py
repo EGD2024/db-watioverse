@@ -169,7 +169,6 @@ class N0Inserter:
             'potencia_contratada_p4': self.extraer_valor_seguro(datos_contract, 'potencia_contratada_p4'),
             'potencia_contratada_p5': self.extraer_valor_seguro(datos_contract, 'potencia_contratada_p5'),
             'potencia_contratada_p6': self.extraer_valor_seguro(datos_contract, 'potencia_contratada_p6'),
-            'tarifa_acceso': self.extraer_valor_seguro(datos_contract, 'tarifa_acceso')
         }
     
     def mapear_datos_energy_consumption(self, datos_json: dict) -> Dict[str, Any]:
@@ -179,7 +178,7 @@ class N0Inserter:
         return {
             'inicio_periodo': self.extraer_valor_seguro(consumo_data, 'inicio_periodo'),
             'fin_periodo': self.extraer_valor_seguro(consumo_data, 'fin_periodo'),
-            'consumo_facturado_mes': self.extraer_valor_seguro(consumo_data, 'consumo_facturado_kwh'),
+            'consumo_kwh': self.extraer_valor_seguro(consumo_data, 'consumo_facturado_kwh'),
             'precio_energia_eur_kwh': self.extraer_valor_seguro(consumo_data, 'precio_energia_eur_kwh'),
             'coste_energia_eur': self.extraer_valor_seguro(consumo_data, 'coste_energia_eur')
         }
@@ -211,7 +210,6 @@ class N0Inserter:
         
         # Mapear campos principales de factura
         invoice_data.update({
-            'numero_factura': self.extraer_valor_seguro(factura_data, 'numero_factura'),
             'fecha_inicio_periodo': self.extraer_valor_seguro(factura_data, 'fecha_inicio_periodo'),
             'fecha_fin_periodo': self.extraer_valor_seguro(factura_data, 'fecha_fin_periodo'),
             'dias_periodo_facturado': self.extraer_valor_seguro(factura_data, 'dias_periodo_facturado'),
@@ -254,6 +252,8 @@ class N0Inserter:
         return invoice_data
     
     def insertar_en_tabla(self, tabla: str, datos: Dict[str, Any]) -> bool:
+        # Log detallado para depuración
+        logger.info(f"[DEBUG] Intentando insertar en tabla '{tabla}': {datos}")
         """Inserta datos en tabla BD (real o simulación)."""
         if self.modo_prueba:
             logger.info(f"  📝 SIMULANDO inserción en tabla '{tabla}':")
