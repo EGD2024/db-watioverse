@@ -1,4 +1,4 @@
-# 🌊 db_watioverse - Ecosistema de Datos Energéticos
+# db_watioverse - Ecosistema de Datos Energéticos
 
 ![Versión](https://img.shields.io/badge/versión-1.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
@@ -14,28 +14,28 @@
 
 ---
 
-## 📑 Tabla de Contenidos
+## Tabla de Contenidos
 
-- [Documentación Especializada](#-documentación-especializada)
-- [Integración Híbrida con eSCORE](#-integración-híbrida-con-escore)
-- [Estructura del Repositorio](#-estructura-del-repositorio)
-- [Pipeline N0→N1](#-pipeline-n0n1)
-- [Configuración del Entorno](#-configuración-del-entorno)
-- [Capa N0 - Datos en Bruto](#-capa-n0---datos-en-bruto)
-- [Flujo de Datos](#-flujo-de-datos)
-
----
-
-## 📑 Documentación Especializada
-
-- 🏗️ **[Arquitectura del Sistema](docs/README_arquitectura.md)** - Detalles técnicos de las 23 bases de datos especializadas
-- 🔒 **[Seguridad de Datos](docs/README_seguridad_datos.md)** - Protección RGPD, hashing y flujos de anonimización
-- 💾 **[Base de Datos N0](N0/README_N0.md)** - Capa de datos en bruto y sistema de versionado
-- ⚡ **[Base de Datos N1](N1/README_N1.md)** - Capa de enriquecimiento y pipeline automático
+- [Documentación Especializada](#documentación-especializada)
+- [Integración Híbrida con eSCORE](#integración-híbrida-con-escore)
+- [Estructura del Repositorio](#estructura-del-repositorio)
+- [Pipeline N0→N1](#pipeline-n0n1)
+- [Configuración del Entorno](#configuración-del-entorno)
+- [Capa N0 - Datos en Bruto](#capa-n0---datos-en-bruto)
+- [Flujo de Datos](#flujo-de-datos)
 
 ---
 
-## 🔗 Integración Híbrida con eSCORE
+## Documentación Especializada
+
+- **[Arquitectura del Sistema](docs/README_arquitectura.md)** - Detalles técnicos de las 23 bases de datos especializadas
+- **[Seguridad de Datos](docs/README_seguridad_datos.md)** - Protección RGPD, hashing y flujos de anonimización
+- **[Base de Datos N0](N0/README_N0.md)** - Capa de datos en bruto y sistema de versionado
+- **[Base de Datos N1](N1/README_N1.md)** - Capa de enriquecimiento y pipeline automático
+
+---
+
+## Integración Híbrida con eSCORE
 
 El ecosistema `db_watioverse` se integra con el Motor eSCORE mediante una arquitectura híbrida que separa responsabilidades y optimiza el flujo de datos energéticos:
 
@@ -74,7 +74,7 @@ graph TD
     style I fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
-## 🔄 Pipeline N0→N1
+## Pipeline N0→N1
 
 El pipeline N0→N1 es el núcleo de la transformación de datos, implementado con validación automática y enriquecimiento inteligente:
 
@@ -94,33 +94,33 @@ El pipeline N0→N1 es el núcleo de la transformación de datos, implementado c
 4. **Validación**: Verificación de integridad y completitud
 5. **Guardado**: Almacenamiento en `Data_out/` con sufijo N1
 
-## 📑 Estructura del Repositorio
+## Estructura del Repositorio
 
 ```
 db_watioverse/
-├── N0/                    # 💾 Capa de datos en bruto
-│   ├── data_versioning/   # 🔄 Herramientas de versionado
-│   ├── insert_N0.py      # 📥 Insertador de datos
-│   ├── monitor_n0_auto.py # 🔍 Monitor automático
-│   └── README.md         # 📋 Documentación N0
-├── N1/                   # ⚡ Capa de enriquecimiento
-│   ├── n1_generator.py   # 🔄 Generador pipeline N0→N1
-│   ├── insert_N1.py     # 📥 Insertador datos N1
-│   ├── monitor_n1_auto.py # 🔍 Monitor automático N1
-│   └── README.md        # 📋 Documentación N1
-├── N2/                  # 📊 Capa de análisis
-├── N3/                  # 🎯 Capa de métricas avanzadas
-├── shared/              # 🔧 Componentes compartidos
-│   ├── field_mappings.py # 🗺️ Mapeos N0→N1
-│   ├── n0_cleaner.py    # 🧹 Limpieza metadatos
-│   ├── enrichment_engine.py # 💎 Motor enriquecimiento
-│   ├── integrity_validator.py # ✅ Validador integridad
-│   └── batch_analysis.py # 📈 Análisis masivo
-├── venv/                # 🐍 Entorno virtual Python
-└── activate_env.sh      # 🚀 Script de activación
+├── N0/                    # Capa de datos en bruto
+│   ├── data_versioning/   # Herramientas de versionado
+│   ├── insert_N0.py      # Insertador de datos
+│   ├── monitor_n0_auto.py # Monitor automático
+│   └── README.md         # Documentación N0
+├── N1/                   # Capa de enriquecimiento
+│   ├── n1_generator.py   # Generador pipeline N0→N1
+│   ├── insert_N1.py     # Insertador datos N1
+│   ├── monitor_n1_auto.py # Monitor automático N1
+│   └── README.md        # Documentación N1
+├── N2/                  # Capa de análisis
+├── N3/                  # Capa de métricas avanzadas
+├── shared/              # Componentes compartidos
+│   ├── field_mappings.py # Mapeos N0→N1
+│   ├── n0_cleaner.py    # Limpieza metadatos
+│   ├── enrichment_engine.py # Motor enriquecimiento
+│   ├── integrity_validator.py # Validador integridad
+│   └── batch_analysis.py # Análisis masivo
+├── venv/                # Entorno virtual Python
+└── activate_env.sh      # Script de activación
 ```
 
-## 🚀 Configuración del Entorno
+## Configuración del Entorno
 
 ### Activar Entorno Virtual
 
@@ -138,7 +138,7 @@ source venv/bin/activate
 - **requests** - Comunicación HTTP con eSCORE
 - **Python 3.8+** - Entorno de ejecución
 
-## 💾 Capa N0 - Datos en Bruto
+## Capa N0 - Datos en Bruto
 
 La capa N0 almacena datos extraídos directamente de facturas energéticas sin procesamiento adicional.
 
@@ -172,7 +172,7 @@ cd shared
 python3 batch_analysis.py
 ```
 
-## 🔄 Flujo de Datos
+## Flujo de Datos
 
 ```mermaid
 graph TD
@@ -196,7 +196,7 @@ graph TD
     style L fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
-## ⚙️ Configuración de Desarrollo
+## Configuración de Desarrollo
 
 ### Variables de Entorno
 

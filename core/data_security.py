@@ -377,7 +377,7 @@ class AuditLogger:
 
 
 # Instancia global para uso en toda la aplicación
-from db_connections import db_manager
+from .db_connections import db_manager
 
 data_hasher = DataHasher()
 version_manager = DataVersionManager(db_manager)

@@ -431,7 +431,7 @@ class MarketPriceAPI:
 
 
 # Instancias globales
-from db_connections import db_manager
+from .db_connections import db_manager
 
 api_manager = ExternalAPIManager(db_manager)
 weather_api = WeatherAPI(api_manager)
