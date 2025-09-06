@@ -13,6 +13,27 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv(Path(__file__).parent.parent.parent / '.env')
+
+# Importar conexiones centralizadas - desde pipeline/N0 ir a motores/db_watioverse/core
+core_path = Path(__file__).parent.parent / 'core'  # ../core desde pipeline/N0
+if not core_path.exists():
+    core_path = Path(__file__).parent.parent.parent / 'core'  # ../../core como fallback
+sys.path.insert(0, str(core_path))
+
+# Import con manejo de errores
+try:
+    from db_connections import db_manager
+    logger = logging.getLogger(__name__)
+    logger.info("✅ Conexiones centralizadas cargadas correctamente")
+except ImportError as e:
+    logging.error(f"❌ Error importando db_connections: {e}")
+    logging.error(f"Buscando en: {core_path}")
+    logging.error(f"Archivo existe: {(core_path / 'db_connections.py').exists()}")
+    raise
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -28,18 +49,31 @@ class InsercionResult:
     tiempo_procesamiento: float
 
 class N0Inserter:
-    """Insertador de datos N0 en modo prueba."""
+    """Insertador de datos N0 con conexiones centralizadas."""
     
     def __init__(self, modo_prueba: bool = True):
         self.modo_prueba = modo_prueba
         self.directorio_data = "/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out"
         self.resultados = []
         
-        # Configurar conexión BD (simulada en modo prueba)
         if not modo_prueba:
             logger.warning("⚠️ MODO PRODUCCIÓN ACTIVADO - Se insertará en BD real")
+            # Verificar conexión N0
+            self._verificar_conexion_n0()
         else:
             logger.info("✅ MODO PRUEBA ACTIVADO - Solo simulación")
+    
+    def _verificar_conexion_n0(self):
+        """Verifica que la conexión N0 esté disponible."""
+        try:
+            with db_manager.transaction('N0') as cursor:
+                cursor.execute('SELECT 1')
+                result = cursor.fetchone()
+                if result:
+                    logger.info("✅ Conexión BD N0 verificada")
+        except Exception as e:
+            logger.error(f"❌ Error verificando conexión BD N0: {e}")
+            raise
     
     def extraer_valor_seguro(self, datos: dict, ruta: str, valor_defecto: Any = None) -> Any:
         """Extrae valor de un diccionario anidado de forma segura."""
@@ -219,8 +253,8 @@ class N0Inserter:
         
         return invoice_data
     
-    def simular_insercion_tabla(self, tabla: str, datos: Dict[str, Any]) -> bool:
-        """Simula inserción en tabla (modo prueba)."""
+    def insertar_en_tabla(self, tabla: str, datos: Dict[str, Any]) -> bool:
+        """Inserta datos en tabla BD (real o simulación)."""
         if self.modo_prueba:
             logger.info(f"  📝 SIMULANDO inserción en tabla '{tabla}':")
             campos_no_nulos = {k: v for k, v in datos.items() if v is not None}
@@ -229,8 +263,41 @@ class N0Inserter:
             logger.info(f"  ✅ Simulación exitosa - {len(campos_no_nulos)} campos")
             return True
         else:
-            # Aquí iría la inserción real en BD
-            logger.warning("⚠️ INSERCIÓN REAL NO IMPLEMENTADA")
+            # Inserción real en BD
+            return self._insertar_real(tabla, datos)
+    
+    def _insertar_real(self, tabla: str, datos: Dict[str, Any]) -> bool:
+        """Ejecuta inserción real usando conexiones centralizadas."""
+        try:
+            # Filtrar campos no nulos
+            campos_no_nulos = {k: v for k, v in datos.items() if v is not None and v != ''}
+            
+            if not campos_no_nulos:
+                logger.warning(f"  ⚠️ Tabla {tabla}: Sin datos válidos para insertar")
+                return True
+            
+            # Construir consulta INSERT con ON CONFLICT para evitar duplicados
+            campos = list(campos_no_nulos.keys())
+            valores = list(campos_no_nulos.values())
+            placeholders = ', '.join(['%s'] * len(valores))
+            campos_str = ', '.join(campos)
+            
+            # Usar UPSERT para evitar errores de duplicado
+            query = f"""INSERT INTO {tabla} ({campos_str}) 
+                         VALUES ({placeholders})
+                         ON CONFLICT DO NOTHING"""
+            
+            with db_manager.transaction('N0') as cursor:
+                cursor.execute(query, valores)
+                affected = cursor.rowcount
+                if affected > 0:
+                    logger.info(f"  ✅ INSERTADO en tabla '{tabla}': {len(campos)} campos")
+                else:
+                    logger.info(f"  🔄 DUPLICADO ignorado en tabla '{tabla}'")
+                return True
+                
+        except Exception as e:
+            logger.error(f"  ❌ Error insertando en tabla '{tabla}': {e}")
             return False
     
     def procesar_archivo_json(self, archivo_path: Path) -> InsercionResult:
@@ -258,12 +325,12 @@ class N0Inserter:
                 'invoice': self.mapear_datos_invoice(datos_json)
             }
             
-            # Simular inserción en cada tabla
+            # Insertar en cada tabla (las transacciones las maneja db_manager)
             for tabla, datos in tablas_datos.items():
-                if self.simular_insercion_tabla(tabla, datos):
+                if self.insertar_en_tabla(tabla, datos):
                     registros_insertados += 1
                 else:
-                    errores.append(f"Error simulando inserción en tabla {tabla}")
+                    errores.append(f"Error insertando en tabla {tabla}")
             
             tiempo_procesamiento = (datetime.now() - inicio_tiempo).total_seconds()
             
@@ -355,29 +422,39 @@ class N0Inserter:
 
 def main():
     """Función principal."""
-    print("🚀 INSERTADOR N0 - MODO PRUEBA")
+    # Determinar modo según argumento
+    modo_prueba = '--produccion' not in sys.argv
+    
+    print(f"🚀 INSERTADOR N0 - MODO {'PRUEBA' if modo_prueba else 'PRODUCCIÓN'}")
     print("=" * 50)
     
-    # Crear insertador en modo prueba
-    inserter = N0Inserter(modo_prueba=True)
+    # Crear insertador
+    inserter = N0Inserter(modo_prueba=modo_prueba)
     
-    # Procesar archivos (limitado a 3 en modo prueba)
-    resultados = inserter.procesar_directorio(limite_archivos=3)
+    try:
+        # Procesar archivos
+        limite = 3 if modo_prueba else None
+        resultados = inserter.procesar_directorio(limite_archivos=limite)
+        
+        # Mostrar reporte
+        reporte = inserter.generar_reporte()
+        print(reporte)
+        
+        # Guardar reporte
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        modo_str = 'prueba' if modo_prueba else 'produccion'
+        archivo_reporte = f"reporte_insercion_n0_{modo_str}_{timestamp}.txt"
+        
+        with open(archivo_reporte, 'w', encoding='utf-8') as f:
+            f.write(reporte)
+        
+        print(f"\n📄 Reporte guardado: {archivo_reporte}")
+        
+        return len([r for r in resultados if r.exito]) == len(resultados)
     
-    # Mostrar reporte
-    reporte = inserter.generar_reporte()
-    print(reporte)
-    
-    # Guardar reporte
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    archivo_reporte = f"reporte_insercion_n0_prueba_{timestamp}.txt"
-    
-    with open(archivo_reporte, 'w', encoding='utf-8') as f:
-        f.write(reporte)
-    
-    print(f"\n📄 Reporte guardado: {archivo_reporte}")
-    
-    return len([r for r in resultados if r.exito]) == len(resultados)
+    finally:
+        # Las conexiones las maneja db_manager automáticamente
+        pass
 
 if __name__ == "__main__":
     main()

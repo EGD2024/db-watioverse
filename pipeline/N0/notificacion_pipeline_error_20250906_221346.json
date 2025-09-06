@@ -1,0 +1,15 @@
+{
+  "timestamp": "20250906_221346",
+  "archivo": "N0_ES0022000001348639QK_20250314_211043.json",
+  "estado": "PIPELINE_COMPLETO_ERROR",
+  "n0_insertado": false,
+  "n1_insertado": false,
+  "error": null,
+  "stats": {
+    "n0_sections": 14,
+    "n1_sections": 12,
+    "n0_inserted_records": 5,
+    "n1_inserted_records": 6
+  },
+  "modo": "PRODUCCION"
+}

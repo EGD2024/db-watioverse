@@ -17,13 +17,22 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Cargar variables de entorno
-env_path = Path(__file__).parent / '.env'
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path)
-    logger.info(f'Variables de entorno cargadas desde: {env_path}')
-else:
-    logger.warning(f'Archivo .env no encontrado en {env_path}')
+# Cargar variables de entorno - buscar en directorio padre
+env_paths = [
+    Path(__file__).parent.parent / '.env',  # db_watioverse/.env
+    Path(__file__).parent / '.env'          # core/.env (fallback)
+]
+
+env_loaded = False
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+        logger.info(f'Variables de entorno cargadas desde: {env_path}')
+        env_loaded = True
+        break
+
+if not env_loaded:
+    logger.warning(f'Archivo .env no encontrado en: {env_paths}')
 
 
 class DatabaseManager:
@@ -99,7 +108,6 @@ class DatabaseManager:
             'simulador': {**self.base_config, 'database': f"db_{os.getenv('DB_SIMULADOR', 'simulador')}"},
             'rag': {**self.base_config, 'database': f"db_{os.getenv('DB_RAG', 'rag')}"},
             'memoria': {**self.base_config, 'database': f"db_{os.getenv('DB_MEMORIA', 'memoria')}"},
-            'preferencias': {**self.base_config, 'database': f"db_{os.getenv('DB_PREFERENCIAS', 'preferencias')}"},
         }
         
         self._init_connection_pools()
@@ -115,13 +123,13 @@ class DatabaseManager:
         
         for db_name, config in self.db_configs.items():
             try:
-                # Tamaño del pool según tipo de BD
+                # Tamaño del pool según tipo de BD - REDUCIDOS para evitar "too many clients"
                 if 'eSCORE' in db_name:
-                    min_conn, max_conn = 1, 50  # eSCORE: consultas frecuentes
+                    min_conn, max_conn = 1, 5   # eSCORE: reducido
                 elif db_name in ['N0', 'N1', 'N2']:
-                    min_conn, max_conn = 2, 100  # Pipeline: alta carga
+                    min_conn, max_conn = 1, 3   # Pipeline: reducido
                 else:
-                    min_conn, max_conn = 1, 20  # Auxiliares: baja carga
+                    min_conn, max_conn = 1, 2   # Auxiliares: mínimo
                 
                 self.connection_pools[db_name] = psycopg2.pool.ThreadedConnectionPool(
                     minconn=min_conn,

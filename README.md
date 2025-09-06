@@ -9,7 +9,7 @@
 **Repositorio de capas de datos para el procesamiento y análisis de información energética con integración híbrida al Motor eSCORE**
 
 **Última actualización:** 6 de Septiembre de 2025
-**Actualizado por:** Sistema Integración Híbrida
+**Actualizado por:** ADG
 **Proyecto interno de Energy Green Data**
 
 ---

@@ -1,4 +1,15 @@
+# === Pipeline N0→N1 Dependencias ===
 watchdog==3.0.0
 psycopg2-binary>=2.9.0
 python-dotenv>=1.0.0
 requests>=2.31.0
+
+# === Data Processing ===
+pandas>=2.0.0
+numpy>=1.24.0
+
+# === APIs y Enriquecimiento ===
+googlemaps>=4.10.0
+
+# === Logging y Utils ===
+pathlib2>=2.3.0

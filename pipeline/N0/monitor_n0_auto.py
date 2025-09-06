@@ -5,16 +5,20 @@ Monitor Automático N0
 Monitorea la carpeta Data_out y dispara inserción automática cuando detecta nuevos archivos N0.
 """
 
+import json
+import time
+import logging
 import os
 import sys
-import time
-import json
-from pathlib import Path
-from typing import Set, Dict, Any
 from datetime import datetime
-import logging
+from pathlib import Path
+from typing import List
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+# Cargar variables de entorno
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent.parent / '.env')
 
 # Configurar logging
 logging.basicConfig(
@@ -27,19 +31,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Importar el insertador N0
-from insert_N0 import N0Inserter
-
-# Importar generador N1 para pipeline automático
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'N1'))
+# Importar el procesador completo N0→N1
+shared_path = Path(__file__).parent.parent / 'shared'
+sys.path.insert(0, str(shared_path))
 try:
-    from n1_generator import N1Generator
-    N1_DISPONIBLE = True
-    logger.info("✅ Pipeline N1 disponible - se ejecutará automáticamente")
+    from n0_to_n1_processor import N0ToN1Processor
+    PROCESSOR_DISPONIBLE = True
+    logger.info("✅ Procesador completo N0→N1 disponible")
 except ImportError as e:
-    N1_DISPONIBLE = False
-    logger.warning(f"⚠️ Pipeline N1 no disponible: {e}")
-    logger.warning("   El monitor N0 funcionará sin disparar pipeline N1")
+    PROCESSOR_DISPONIBLE = False
+    logger.error(f"❌ Procesador N0→N1 no disponible: {e}")
+    
+    # Fallback a insertador N0 solo
+    from insert_N0 import N0Inserter
 
 class N0FileHandler(FileSystemEventHandler):
     """Manejador de eventos para archivos N0."""
@@ -48,30 +52,38 @@ class N0FileHandler(FileSystemEventHandler):
         super().__init__()
         self.modo_prueba = modo_prueba
         self.archivos_procesados: Set[str] = set()
-        self.inserter = N0Inserter(modo_prueba=modo_prueba)
         self.cooldown_segundos = 5  # Evitar procesamiento múltiple
         self.ultimo_procesamiento: Dict[str, float] = {}
         
-        # Configurar pipeline N1 si está disponible
-        self.pipeline_n1_activo = N1_DISPONIBLE
-        if self.pipeline_n1_activo:
-            try:
-                self.n1_generator = N1Generator()
-                logger.info("🔗 Pipeline N1 configurado correctamente")
-            except Exception as e:
-                logger.error(f"❌ Error configurando pipeline N1: {e}")
-                self.pipeline_n1_activo = False
+        # Configurar procesador completo N0→N1
+        if PROCESSOR_DISPONIBLE:
+            self.processor = N0ToN1Processor(modo_prueba=modo_prueba)
+            self.pipeline_completo_activo = True
+            logger.info("🚀 Procesador completo N0→N1 configurado")
+        else:
+            # Fallback a insertador N0 solo
+            self.inserter = N0Inserter(modo_prueba=modo_prueba)
+            self.pipeline_completo_activo = False
+            logger.warning("⚠️ Usando solo insertador N0 (sin pipeline N1)")
+        
+        # Configurar directorio de monitoreo
+        if PROCESSOR_DISPONIBLE:
+            self.directorio_data = "/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out"
+        else:
+            self.directorio_data = self.inserter.directorio_data
         
         # Cargar archivos ya existentes para evitar reprocesamiento
         self._cargar_archivos_existentes()
         
         logger.info(f"🔍 Monitor N0 iniciado - MODO {'PRUEBA' if modo_prueba else 'PRODUCCIÓN'}")
-        if self.pipeline_n1_activo:
-            logger.info("🚀 Pipeline automático N0→N1 ACTIVADO")
+        if self.pipeline_completo_activo:
+            logger.info("🚀 Pipeline automático N0→BD N0→N1→BD N1 ACTIVADO")
+        else:
+            logger.info("📊 Solo insertador N0 disponible")
     
     def _cargar_archivos_existentes(self):
         """Carga archivos N0 existentes para evitar reprocesarlos."""
-        data_path = Path(self.inserter.directorio_data)
+        data_path = Path(self.directorio_data)
         archivos_existentes = list(data_path.glob("N0_*.json"))
         
         for archivo in archivos_existentes:
@@ -79,28 +91,17 @@ class N0FileHandler(FileSystemEventHandler):
         
         logger.info(f"📋 Archivos N0 existentes registrados: {len(archivos_existentes)}")
     
-    def _es_archivo_n0_valido(self, archivo_path: str) -> bool:
+    def _es_archivo_n0(self, archivo_path: str) -> bool:
         """Verifica si es un archivo N0 válido."""
-        archivo_name = Path(archivo_path).name
-        
-        # Debe ser JSON y empezar con N0_
-        if not (archivo_name.startswith("N0_") and archivo_name.endswith(".json")):
-            return False
-        
-        # Verificar que el archivo existe y no está vacío
-        try:
-            if not Path(archivo_path).exists():
-                return False
-            
-            # Verificar que es JSON válido
-            with open(archivo_path, 'r', encoding='utf-8') as f:
-                json.load(f)
-            
-            return True
-            
-        except (json.JSONDecodeError, IOError) as e:
-            logger.warning(f"⚠️ Archivo N0 inválido {archivo_name}: {e}")
-            return False
+        nombre = os.path.basename(archivo_path)
+        return (
+            nombre.endswith('.json') and 
+            nombre.startswith('N0_') and
+            not nombre.startswith('.') and
+            '_TEMP_' not in nombre and  # IGNORAR archivos temporales
+            '_CLEAN' not in nombre and  # IGNORAR archivos N1 limpios
+            os.path.getsize(archivo_path) > 100  # Mínimo 100 bytes
+        )
     
     def _debe_procesar_archivo(self, archivo_path: str) -> bool:
         """Determina si debe procesar el archivo."""
@@ -119,68 +120,105 @@ class N0FileHandler(FileSystemEventHandler):
         
         return True
     
-    def _procesar_archivo_n0(self, archivo_path: str):
-        """Procesa un archivo N0 nuevo."""
+    def _procesar_archivo(self, archivo_path: str):
+        """Procesa un archivo N0 detectado."""
         archivo_name = Path(archivo_path).name
         
         try:
-            logger.info(f"🚀 NUEVO ARCHIVO N0 DETECTADO: {archivo_name}")
+            logger.info(f" Procesando archivo: {archivo_name}")
             
-            # Marcar tiempo de procesamiento
-            self.ultimo_procesamiento[archivo_name] = time.time()
+            if self.pipeline_completo_activo:
+                # Usar procesador completo N0→N1
+                resultado = self.processor.process_n0_file(
+                    archivo_path, 
+                    enable_n0_insert=True, 
+                    enable_n1_insert=True
+                )
+                
+                if resultado['success']:
+                    logger.info(f" Pipeline completo exitoso: {archivo_name}")
+                    logger.info(f"   N0: {resultado['stats'].get('n0_inserted_records', 0)} registros")
+                    logger.info(f"   N1: {resultado['stats'].get('n1_inserted_records', 0)} registros")
+                    
+                    # Marcar como procesado
+                    self.archivos_procesados.add(archivo_name)
+                    
+                    # Generar notificación de éxito completo
+                    self._generar_notificacion_pipeline_exito(resultado)
+                    
+                else:
+                    logger.error(f" Error en pipeline completo {archivo_name}:")
+                    logger.error(f"   • {resultado.get('error', 'Error desconocido')}")
+                    
+                    # Generar notificación de error
+                    self._generar_notificacion_pipeline_error(resultado)
             
-            # Procesar archivo
-            resultado = self.inserter.procesar_archivo_json(Path(archivo_path))
-            
-            if resultado.exito:
-                logger.info(f"✅ Procesamiento exitoso: {archivo_name}")
-                logger.info(f"   📊 {resultado.registros_insertados} tablas insertadas")
-                logger.info(f"   ⏱️ Tiempo: {resultado.tiempo_procesamiento:.2f}s")
-                
-                # Marcar como procesado
-                self.archivos_procesados.add(archivo_name)
-                
-                # DISPARAR PIPELINE N1 AUTOMÁTICAMENTE
-                if self.pipeline_n1_activo:
-                    self._disparar_pipeline_n1(archivo_path)
-                
-                # Generar notificación
-                self._generar_notificacion_exito(resultado)
-                
             else:
-                logger.error(f"❌ Error procesando {archivo_name}:")
-                for error in resultado.errores:
-                    logger.error(f"   • {error}")
+                # Fallback: usar solo insertador N0
+                resultado = self.inserter.procesar_archivo_json(Path(archivo_path))
                 
-                # Generar notificación de error
-                self._generar_notificacion_error(resultado)
+                if resultado.exito:
+                    logger.info(f" Procesamiento N0 exitoso: {archivo_name}")
+                    logger.info(f"   {resultado.registros_insertados} tablas insertadas")
+                    logger.info(f"   Tiempo: {resultado.tiempo_procesamiento:.2f}s")
+                    
+                    # Marcar como procesado
+                    self.archivos_procesados.add(archivo_name)
+                    
+                    # Generar notificación
+                    self._generar_notificacion_exito(resultado)
+                    
+                else:
+                    logger.error(f" Error procesando {archivo_name}:")
+                    for error in resultado.errores:
+                        logger.error(f"   • {error}")
+                    
+                    # Generar notificación de error
+                    self._generar_notificacion_error(resultado)
             
         except Exception as e:
-            logger.error(f"💥 Error crítico procesando {archivo_name}: {e}")
+            logger.error(f" Error crítico procesando {archivo_name}: {e}")
     
-    def _disparar_pipeline_n1(self, archivo_path: str):
-        """Dispara automáticamente el pipeline N1 después de procesar N0."""
-        archivo_name = Path(archivo_path).name
+    def _generar_notificacion_pipeline_exito(self, resultado):
+        """Genera notificación de pipeline completo exitoso."""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        notificacion = {
+            'timestamp': timestamp,
+            'archivo': Path(resultado['file_path']).name,
+            'estado': 'PIPELINE_COMPLETO_EXITO',
+            'n0_insertado': resultado.get('n0_insert_success', False),
+            'n1_insertado': resultado.get('n1_insert_success', False),
+            'stats': resultado.get('stats', {}),
+            'modo': 'PRUEBA' if self.modo_prueba else 'PRODUCCION'
+        }
         
-        try:
-            logger.info(f"🔗 DISPARANDO PIPELINE N1 para: {archivo_name}")
-            
-            # Generar N1 desde N0
-            archivo_n1 = self.n1_generator.generate_n1_from_file(archivo_path)
-            
-            if archivo_n1:
-                logger.info(f"✅ Pipeline N1 exitoso: {Path(archivo_n1).name}")
-                logger.info(f"   📊 Enriquecimiento aplicado correctamente")
-                
-                # Disparar inserción N1 automática si está configurada
-                self._disparar_insercion_n1(archivo_n1)
-                
-            else:
-                logger.error(f"❌ Error en pipeline N1 para {archivo_name}")
-                logger.error("   • No se pudo generar archivo N1")
-                        
-        except Exception as e:
-            logger.error(f"💥 Error crítico en pipeline N1 para {archivo_name}: {e}")
+        # Guardar notificación
+        archivo_notif = f"notificacion_pipeline_exito_{timestamp}.json"
+        with open(archivo_notif, 'w', encoding='utf-8') as f:
+            json.dump(notificacion, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"📄 Notificación pipeline guardada: {archivo_notif}")
+    
+    def _generar_notificacion_pipeline_error(self, resultado):
+        """Genera notificación de error en pipeline completo."""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        notificacion = {
+            'timestamp': timestamp,
+            'archivo': Path(resultado['file_path']).name,
+            'estado': 'PIPELINE_COMPLETO_ERROR',
+            'n0_insertado': resultado.get('n0_insert_success', False),
+            'n1_insertado': resultado.get('n1_insert_success', False),
+            'error': resultado.get('error', 'Error desconocido'),
+            'stats': resultado.get('stats', {}),
+            'modo': 'PRUEBA' if self.modo_prueba else 'PRODUCCION'
+        }
+        
+        # Guardar notificación
+        archivo_notif = f"notificacion_pipeline_error_{timestamp}.json"
+        with open(archivo_notif, 'w', encoding='utf-8') as f:
+            json.dump(notificacion, f, indent=2, ensure_ascii=False)
+        
+        logger.error(f"📄 Notificación error guardada: {archivo_notif}")
     
     def _disparar_insercion_n1(self, archivo_n1_path: str):
         """Dispara inserción automática del archivo N1 generado."""
@@ -254,7 +292,7 @@ class N0FileHandler(FileSystemEventHandler):
         archivo_path = event.src_path
         
         # Verificar si es archivo N0 válido
-        if not self._es_archivo_n0_valido(archivo_path):
+        if not self._es_archivo_n0(archivo_path):
             return
         
         # Verificar si debe procesarse
@@ -265,39 +303,33 @@ class N0FileHandler(FileSystemEventHandler):
         time.sleep(1)
         
         # Procesar archivo
-        self._procesar_archivo_n0(archivo_path)
+        self._procesar_archivo(archivo_path)
     
     def on_moved(self, event):
         """Evento: archivo movido."""
         if event.is_directory:
             return
         
-        # Tratar como archivo nuevo
-        self.on_created(event)
+        # Si es un archivo N0 movido, procesarlo
+        if event.dest_path.endswith('.json') and 'N0_' in os.path.basename(event.dest_path):
+            logger.info(f"📂 Archivo N0 movido: {event.dest_path}")
+            self._procesar_nuevo_archivo(event.dest_path)
     
-    def generar_reporte_estado(self) -> str:
+    def generar_reporte_estado(self) -> List[str]:
         """Genera reporte del estado actual del monitor."""
         reporte = []
-        reporte.append("=" * 60)
-        reporte.append("📊 ESTADO MONITOR N0")
-        reporte.append("=" * 60)
-        reporte.append(f"🔍 Modo: {'PRUEBA' if self.modo_prueba else 'PRODUCCIÓN'}")
-        reporte.append(f"📁 Directorio monitoreado: {self.inserter.directorio_data}")
+        reporte.append(f"📊 ESTADO DEL MONITOR N0")
+        reporte.append(f"{'='*50}")
+        reporte.append(f"⚙️ Modo: {'PRUEBA' if self.modo_prueba else 'PRODUCCIÓN'}")
+        reporte.append(f"📁 Directorio monitoreado: {self.directorio_data}")
         reporte.append(f"📋 Archivos procesados: {len(self.archivos_procesados)}")
-        reporte.append(f"⏱️ Cooldown: {self.cooldown_segundos}s")
-        reporte.append(f"🔗 Pipeline N1: {'ACTIVO' if self.pipeline_n1_activo else 'INACTIVO'}")
-        reporte.append("")
         
         if self.archivos_procesados:
-            reporte.append("✅ ARCHIVOS PROCESADOS:")
-            for archivo in sorted(self.archivos_procesados):
-                reporte.append(f"  - {archivo}")
+            reporte.append(f"\n📂 Últimos archivos procesados:")
+            for archivo in sorted(list(self.archivos_procesados)[-5:]):
+                reporte.append(f"   • {archivo}")
         
-        reporte.append("")
-        reporte.append(f"🕐 Último reporte: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        reporte.append("=" * 60)
-        
-        return "\n".join(reporte)
+        return reporte
 
 class N0Monitor:
     """Monitor principal para archivos N0."""
@@ -398,8 +430,8 @@ def main():
     print("Presiona Ctrl+C para detener")
     print()
     
-    # Crear monitor en modo prueba
-    monitor = N0Monitor(modo_prueba=True)
+    # Crear monitor en MODO REAL
+    monitor = N0Monitor(modo_prueba=False)
     
     # Procesar archivos pendientes primero
     if hasattr(monitor, 'handler') and monitor.handler:

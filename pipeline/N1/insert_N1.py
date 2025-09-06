@@ -14,14 +14,27 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
 
-# Importar psycopg2 solo si no estamos en modo prueba
+# Cargar variables de entorno
+load_dotenv(Path(__file__).parent.parent.parent / '.env')
+
+# Importar conexiones centralizadas - desde pipeline/N1 ir a motores/db_watioverse/core
+core_path = Path(__file__).parent.parent / 'core'  # ../core desde pipeline/N1
+if not core_path.exists():
+    core_path = Path(__file__).parent.parent.parent / 'core'  # ../../core como fallback
+sys.path.insert(0, str(core_path))
+
+# Import con manejo de errores
 try:
-    import psycopg2
-    PSYCOPG2_AVAILABLE = True
-except ImportError:
-    PSYCOPG2_AVAILABLE = False
-    logging.warning("psycopg2 no disponible - solo modo prueba")
+    from db_connections import db_manager
+    logger = logging.getLogger(__name__)
+    logger.info("✅ Conexiones centralizadas N1 cargadas correctamente")
+except ImportError as e:
+    logging.error(f"❌ Error importando db_connections: {e}")
+    logging.error(f"Buscando en: {core_path}")
+    logging.error(f"Archivo existe: {(core_path / 'db_connections.py').exists()}")
+    raise
 
 # Añadir directorio shared al path
 sys.path.append(str(Path(__file__).parent.parent / 'shared'))
@@ -42,37 +55,29 @@ class InsercionN1Result:
     tiempo_procesamiento: float
 
 class N1Inserter:
-    """Insertador de datos N1 enriquecidos."""
+    """Insertador de datos N1 enriquecidos con conexiones centralizadas."""
     
     def __init__(self, modo_prueba: bool = True):
         self.modo_prueba = modo_prueba
         self.resultados = []
-        self.connection = None
         
         if not modo_prueba:
             logger.warning("⚠️ MODO PRODUCCIÓN ACTIVADO - Se insertará en BD N1 real")
-            self._conectar_bd()
+            self._verificar_conexion_n1()
         else:
             logger.info("✅ MODO PRUEBA ACTIVADO - Solo simulación")
     
-    def _conectar_bd(self):
-        """Conecta a la base de datos N1."""
-        if not PSYCOPG2_AVAILABLE:
-            logger.error("❌ psycopg2 no disponible - no se puede conectar a BD")
-            raise ImportError("psycopg2 requerido para modo producción")
-        
+    def _verificar_conexion_n1(self):
+        """Verifica que la conexión N1 esté disponible."""
         try:
-            self.connection = psycopg2.connect(**N1_DB_CONFIG)
-            logger.info("✅ Conexión BD N1 establecida")
+            with db_manager.transaction('N1') as cursor:
+                cursor.execute('SELECT 1')
+                result = cursor.fetchone()
+                if result:
+                    logger.info("✅ Conexión BD N1 verificada")
         except Exception as e:
-            logger.error(f"❌ Error conectando BD N1: {e}")
+            logger.error(f"❌ Error verificando conexión BD N1: {e}")
             raise
-    
-    def _cerrar_conexion(self):
-        """Cierra la conexión a BD."""
-        if self.connection:
-            self.connection.close()
-            logger.info("🔌 Conexión BD N1 cerrada")
     
     def extraer_valor_seguro(self, datos: dict, campo: str, valor_defecto: Any = None) -> Any:
         """Extrae valor de un diccionario de forma segura."""
@@ -208,39 +213,44 @@ class N1Inserter:
             return self._insertar_real_tabla(tabla, datos)
     
     def _insertar_real_tabla(self, tabla: str, datos: Dict[str, Any]) -> bool:
-        """Inserción real en BD N1."""
+        """Inserción real en BD N1 usando conexiones centralizadas."""
         try:
             # Filtrar campos nulos
-            campos_no_nulos = {k: v for k, v in datos.items() if v is not None}
+            campos_no_nulos = {k: v for k, v in datos.items() if v is not None and v != ''}
             
             if not campos_no_nulos:
-                logger.warning(f"No hay datos para insertar en tabla {tabla}")
+                logger.warning(f"  ⚠️ Tabla {tabla}: Sin datos válidos para insertar")
                 return True
             
-            # Construir query INSERT
+            # Construir query INSERT con UPSERT
             campos = list(campos_no_nulos.keys())
             valores = list(campos_no_nulos.values())
             placeholders = ', '.join(['%s'] * len(campos))
+            campos_str = ', '.join(campos)
             
-            query = f"""
-                INSERT INTO {tabla} ({', '.join(campos)})
-                VALUES ({placeholders})
-                ON CONFLICT (cups) DO UPDATE SET
-                {', '.join([f'{campo} = EXCLUDED.{campo}' for campo in campos if campo != 'cups'])}
-            """
+            # UPSERT con ON CONFLICT
+            if 'cups' in campos:
+                # Tablas con CUPS como clave primaria
+                update_fields = [f'{campo} = EXCLUDED.{campo}' for campo in campos if campo != 'cups']
+                conflict_clause = f"ON CONFLICT (cups) DO UPDATE SET {', '.join(update_fields)}" if update_fields else "ON CONFLICT (cups) DO NOTHING"
+            else:
+                conflict_clause = "ON CONFLICT DO NOTHING"
             
-            cursor = self.connection.cursor()
-            cursor.execute(query, valores)
-            self.connection.commit()
-            cursor.close()
+            query = f"""INSERT INTO {tabla} ({campos_str}) 
+                         VALUES ({placeholders})
+                         {conflict_clause}"""
             
-            logger.info(f"✅ Inserción real exitosa en {tabla}: {len(campos_no_nulos)} campos")
-            return True
-            
+            with db_manager.transaction('N1') as cursor:
+                cursor.execute(query, valores)
+                affected = cursor.rowcount
+                if affected > 0:
+                    logger.info(f"  ✅ INSERTADO en tabla N1 '{tabla}': {len(campos)} campos")
+                else:
+                    logger.info(f"  🔄 DUPLICADO ignorado en tabla N1 '{tabla}'")
+                return True
+                
         except Exception as e:
-            logger.error(f"❌ Error inserción real en {tabla}: {e}")
-            if self.connection:
-                self.connection.rollback()
+            logger.error(f"  ❌ Error insertando en tabla N1 '{tabla}': {e}")
             return False
     
     def procesar_archivo_json(self, archivo_path: Path) -> InsercionN1Result:
@@ -382,8 +392,8 @@ class N1Inserter:
         return "\n".join(reporte)
     
     def __del__(self):
-        """Destructor para cerrar conexión BD."""
-        self._cerrar_conexion()
+        """Destructor - conexiones manejadas por db_manager."""
+        pass
 
 def insertar_n1_file(n1_json_path: str, modo_prueba: bool = True) -> bool:
     """
