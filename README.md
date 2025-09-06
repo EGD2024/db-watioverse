@@ -98,26 +98,38 @@ El pipeline N0→N1 es el núcleo de la transformación de datos, implementado c
 
 ```
 db_watioverse/
-├── N0/                    # Capa de datos en bruto
-│   ├── data_versioning/   # Herramientas de versionado
-│   ├── insert_N0.py      # Insertador de datos
-│   ├── monitor_n0_auto.py # Monitor automático
-│   └── README.md         # Documentación N0
-├── N1/                   # Capa de enriquecimiento
-│   ├── n1_generator.py   # Generador pipeline N0→N1
-│   ├── insert_N1.py     # Insertador datos N1
-│   ├── monitor_n1_auto.py # Monitor automático N1
-│   └── README.md        # Documentación N1
-├── N2/                  # Capa de análisis
-├── N3/                  # Capa de métricas avanzadas
-├── shared/              # Componentes compartidos
-│   ├── field_mappings.py # Mapeos N0→N1
-│   ├── n0_cleaner.py    # Limpieza metadatos
-│   ├── enrichment_engine.py # Motor enriquecimiento
-│   ├── integrity_validator.py # Validador integridad
-│   └── batch_analysis.py # Análisis masivo
-├── venv/                # Entorno virtual Python
-└── activate_env.sh      # Script de activación
+├── README.md            # Documentación principal
+├── .env.example         # Plantilla configuración
+├── setup_env.sh         # Script configuración automática
+├── requirements.txt     # Dependencias Python
+├── activate_env.sh      # Script de activación
+├── venv/               # Entorno virtual Python
+│
+├── docs/               # Documentación especializada
+│   ├── README_arquitectura.md     # 23 bases de datos
+│   ├── README_seguridad_datos.md  # Protección RGPD
+│   └── assets/         # Logos y diagramas
+│
+├── core/               # Infraestructura central
+│   ├── __init__.py     # Módulo principal
+│   ├── db_connections.py          # Gestor 23 conexiones BD
+│   ├── data_security.py           # Hashing + versionado
+│   └── external_apis.py           # APIs AEMET/Catastro/OMIE
+│
+├── sql/                # Scripts SQL organizados
+│   └── security/       # Scripts de seguridad
+│       ├── security_tables_N1.sql
+│       ├── security_tables_enriquecimiento.sql
+│       └── README_ejecucion.md
+│
+├── pipeline/           # Pipeline de datos
+│   ├── N0/            # Capa datos brutos
+│   ├── N1/            # Capa enriquecimiento
+│   ├── N2/, N3/       # Capas futuras
+│   └── shared/        # Componentes compartidos
+│
+└── test/              # Tests del sistema
+    └── test_security_system.py   # Verificación seguridad
 ```
 
 ## Configuración del Entorno
@@ -132,11 +144,26 @@ db_watioverse/
 source venv/bin/activate
 ```
 
+### Configuración Rápida
+
+```bash
+# 1. Configuración automática completa
+./setup_env.sh
+
+# 2. Activar entorno e instalar dependencias
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Probar sistema de seguridad
+python3 test/test_security_system.py
+```
+
 ### Dependencias Instaladas
 
-- **watchdog==3.0.0** - Monitoreo de sistema de archivos
-- **requests** - Comunicación HTTP con eSCORE
-- **Python 3.8+** - Entorno de ejecución
+- **psycopg2-binary>=2.9.0** - Conexión PostgreSQL
+- **python-dotenv>=1.0.0** - Variables de entorno
+- **requests>=2.31.0** - APIs externas
+- **watchdog==3.0.0** - Monitoreo de archivos
 
 ## Capa N0 - Datos en Bruto
 
