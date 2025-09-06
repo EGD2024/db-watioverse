@@ -16,12 +16,22 @@
 
 ## 📑 Tabla de Contenidos
 
+- [Documentación Especializada](#-documentación-especializada)
 - [Integración Híbrida con eSCORE](#-integración-híbrida-con-escore)
 - [Estructura del Repositorio](#-estructura-del-repositorio)
 - [Pipeline N0→N1](#-pipeline-n0n1)
 - [Configuración del Entorno](#-configuración-del-entorno)
 - [Capa N0 - Datos en Bruto](#-capa-n0---datos-en-bruto)
 - [Flujo de Datos](#-flujo-de-datos)
+
+---
+
+## 📑 Documentación Especializada
+
+- 🏗️ **[Arquitectura del Sistema](docs/README_arquitectura.md)** - Detalles técnicos de las 23 bases de datos especializadas
+- 🔒 **[Seguridad de Datos](docs/README_seguridad_datos.md)** - Protección RGPD, hashing y flujos de anonimización
+- 💾 **[Base de Datos N0](N0/README_N0.md)** - Capa de datos en bruto y sistema de versionado
+- ⚡ **[Base de Datos N1](N1/README_N1.md)** - Capa de enriquecimiento y pipeline automático
 
 ---
 
