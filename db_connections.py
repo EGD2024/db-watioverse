@@ -199,6 +199,11 @@ class DatabaseManager:
         try:
             conn = self.get_connection(db_name)
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Configurar esquema según la base de datos
+            if db_name == 'N2':
+                cursor.execute("SET search_path TO n2_electricidad, public;")
+            
             yield cursor
             conn.commit()
             logger.debug(f"Transacción confirmada en '{db_name}'")

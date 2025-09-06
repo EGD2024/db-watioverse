@@ -5,6 +5,7 @@
 -- =====================================================
 
 -- TABLA 1: CADASTRAL_DATA - Datos catastrales por referencia
+DROP TABLE IF EXISTS cadastral_data CASCADE;
 CREATE TABLE cadastral_data (
     id SERIAL PRIMARY KEY,
     referencia_catastral VARCHAR(20) NOT NULL UNIQUE,
@@ -35,6 +36,7 @@ CREATE TABLE cadastral_data (
 );
 
 -- TABLA 2: BUILDING_CHARACTERISTICS - Características edificios
+DROP TABLE IF EXISTS building_characteristics CASCADE;
 CREATE TABLE building_characteristics (
     id SERIAL PRIMARY KEY,
     referencia_catastral VARCHAR(20) REFERENCES cadastral_data(referencia_catastral),
@@ -62,6 +64,7 @@ CREATE TABLE building_characteristics (
 );
 
 -- TABLA 3: ENERGY_CERTIFICATES - Certificados energéticos
+DROP TABLE IF EXISTS energy_certificates CASCADE;
 CREATE TABLE energy_certificates (
     id SERIAL PRIMARY KEY,
     referencia_catastral VARCHAR(20) REFERENCES cadastral_data(referencia_catastral),
@@ -86,6 +89,7 @@ CREATE TABLE energy_certificates (
 );
 
 -- TABLA 4: CADASTRAL_CACHE - Cache de consultas
+DROP TABLE IF EXISTS cadastral_cache CASCADE;
 CREATE TABLE cadastral_cache (
     id SERIAL PRIMARY KEY,
     query_key VARCHAR(100) NOT NULL UNIQUE,
