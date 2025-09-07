@@ -1,0 +1,120 @@
+================================================================================
+AUDITORÍA DE CAMPOS - PIPELINE N0→N1
+Generado: 2025-09-07 01:57:23
+================================================================================
+
+📊 RESUMEN EJECUTIVO
+--------------------------------------------------
+📄 Campos en JSON N0 (muestra): 244
+🗄️ Campos en BD N0: 0
+🗄️ Campos en BD N1: 0
+⚠️ Pérdida N0: 244 campos (100.0%)
+⚠️ Pérdida N1: 244 campos (100.0%)
+
+🗄️ DETALLE BD N0
+--------------------------------------------------
+🗄️ DETALLE BD N1
+--------------------------------------------------
+📄 CAMPOS EN JSON N0 (muestra primeros 100)
+--------------------------------------------------
+   • client
+   • client.nif_titular
+   • client.nif_titular.confidence
+   • client.nif_titular.pattern
+   • client.nif_titular.source
+   • client.nif_titular.value
+   • client.nombre_cliente
+   • contract_2x3
+   • contract_2x3.comercializadora
+   • contract_2x3.cups_electricidad
+   • contract_2x3.distribuidora
+   • contract_2x3.fecha_fin_contrato
+   • contract_2x3.fecha_inicio_contrato
+   • contract_2x3.mercado
+   • contract_2x3.nombre_producto
+   • contract_2x3.numero_contrato_comercializadora
+   • contract_2x3.numero_contrato_distribuidora
+   • contract_2x3.potencia_contratada_p1
+   • contract_2x3.potencia_contratada_p2
+   • contract_2x3.precio_unitario_potencia_p1
+   • contract_2x3.precio_unitario_potencia_p2
+   • contract_2x3.tarifa_acceso
+   • energy_consumption
+   • energy_consumption.consumo_facturado_kwh
+   • energy_consumption.consumo_medido_kwh
+   • energy_consumption.coste_cargos_eur
+   • energy_consumption.coste_energia_eur
+   • energy_consumption.coste_margen_comercializadora_eur
+   • energy_consumption.coste_peaje_eur
+   • energy_consumption.coste_total_energia_eur
+   • energy_consumption.fin_periodo
+   • energy_consumption.inicio_periodo
+   • energy_consumption.margen_comercializadora_eur_kwh
+   • energy_consumption.precio_cargos_eur_kwh
+   • energy_consumption.precio_energia_eur_kwh
+   • energy_consumption.precio_peaje_eur_kwh
+   • energy_consumption.precio_total_energia_eur_kwh
+   • id_cups
+   • id_cups_confianza
+   • id_cups_pais
+   • invoice_2x3
+   • invoice_2x3.ajuste_mecanismo_iberico
+   • invoice_2x3.alquiler_contador
+   • invoice_2x3.año
+   • invoice_2x3.bono_social
+   • invoice_2x3.consumo_facturado_capacitiva_p1
+   • invoice_2x3.consumo_facturado_capacitiva_p2
+   • invoice_2x3.consumo_facturado_capacitiva_p3
+   • invoice_2x3.consumo_facturado_kwh_p1
+   • invoice_2x3.consumo_facturado_kwh_p2
+   • invoice_2x3.consumo_facturado_kwh_p3
+   • invoice_2x3.consumo_facturado_reactiva_p1
+   • invoice_2x3.consumo_facturado_reactiva_p2
+   • invoice_2x3.consumo_facturado_reactiva_p3
+   • invoice_2x3.consumo_medido_capacitiva_p1
+   • invoice_2x3.consumo_medido_capacitiva_p2
+   • invoice_2x3.consumo_medido_capacitiva_p3
+   • invoice_2x3.consumo_medido_kwh_p1
+   • invoice_2x3.consumo_medido_kwh_p2
+   • invoice_2x3.consumo_medido_kwh_p3
+   • invoice_2x3.consumo_medido_reactiva_p1
+   • invoice_2x3.consumo_medido_reactiva_p2
+   • invoice_2x3.consumo_medido_reactiva_p3
+   • invoice_2x3.consumo_promedio_diario_kwh
+   • invoice_2x3.coste_cargos_energia_p1
+   • invoice_2x3.coste_cargos_energia_p2
+   • invoice_2x3.coste_cargos_energia_p3
+   • invoice_2x3.coste_cargos_potencia_p1
+   • invoice_2x3.coste_cargos_potencia_p2
+   • invoice_2x3.coste_energia_p1
+   • invoice_2x3.coste_energia_p2
+   • invoice_2x3.coste_energia_p3
+   • invoice_2x3.coste_energia_total
+   • invoice_2x3.coste_margen_comercializadora_p1
+   • invoice_2x3.coste_margen_comercializadora_p2
+   • invoice_2x3.coste_margen_comercializadora_p3
+   • invoice_2x3.coste_margen_comercializadora_potencia_p1
+   • invoice_2x3.coste_margen_comercializadora_potencia_p2
+   • invoice_2x3.coste_otro_concepto
+   • invoice_2x3.coste_otro_servicio
+   • invoice_2x3.coste_peaje_p1
+   • invoice_2x3.coste_peaje_p2
+   • invoice_2x3.coste_peaje_p3
+   • invoice_2x3.coste_peaje_potencia_p1
+   • invoice_2x3.coste_peaje_potencia_p2
+   • invoice_2x3.coste_potencia_p1
+   • invoice_2x3.coste_potencia_p2
+   • invoice_2x3.coste_potencia_total
+   • invoice_2x3.coste_promedio_diario_eur
+   • invoice_2x3.coste_total_energia_p1
+   • invoice_2x3.coste_total_energia_p2
+   • invoice_2x3.coste_total_energia_p3
+   • invoice_2x3.coste_total_potencia_p1
+   • invoice_2x3.coste_total_potencia_p2
+   • invoice_2x3.descuento_energia
+   • invoice_2x3.descuento_otro_concepto
+   • invoice_2x3.descuento_potencia
+   • invoice_2x3.descuento_servicio
+   • invoice_2x3.dias_periodo_facturado
+   • invoice_2x3.energia_vertida_kwh
+   ... y 144 campos más

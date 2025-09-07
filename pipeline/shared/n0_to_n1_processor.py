@@ -86,8 +86,8 @@ class N0ToN1Processor:
                     json.dump(n0_for_bd, f, indent=2, ensure_ascii=False)
                 
                 # Usar insertador N0 con archivo temporal
-                n0_insert_result = self.insert_n0.procesar_archivo_json(Path(temp_n0_path))
-                result['n0_insert_success'] = n0_insert_result.exito
+                n0_insert_result = self.insert_n0.procesar_archivo(Path(temp_n0_path))
+                result['n0_insert_success'] = n0_insert_result.exitoso
                 result['stats']['n0_inserted_records'] = n0_insert_result.registros_insertados
                 
                 # NO mover archivos N1 aquí - se hace después de la inserción N1
@@ -98,6 +98,15 @@ class N0ToN1Processor:
                 
                 if result['n0_insert_success']:
                     logger.info("✅ N0 semi-plano insertado exitosamente en BD N0")
+                    
+                    # Ejecutar auditoría de campos post-inserción N0
+                    try:
+                        from campos_audit import CamposAuditor
+                        auditor = CamposAuditor()
+                        auditor.generar_reporte_completo()
+                        logger.info("✅ Auditoría N0 completada")
+                    except Exception as audit_error:
+                        logger.warning(f"⚠️ Error en auditoría N0: {audit_error}")
                 else:
                     logger.error(f"❌ Error insertando N0: {n0_insert_result.errores}")
             else:

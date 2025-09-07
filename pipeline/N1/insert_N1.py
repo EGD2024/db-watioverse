@@ -415,7 +415,7 @@ class N1Inserter:
             logger.error(f"  ❌ Error insertando en tabla N1 '{tabla}': {e}")
             return False
     
-    def procesar_archivo_json(self, archivo_path: Path) -> InsercionN1Result:
+    def procesar_archivo(self, archivo_path: Path) -> InsercionN1Result:
         """Procesa un archivo JSON N1 individual."""
         inicio_tiempo = datetime.now()
         errores = []
@@ -500,7 +500,7 @@ class N1Inserter:
         # Procesar cada archivo
         resultados = []
         for archivo in archivos_json:
-            resultado = self.procesar_archivo_json(archivo)
+            resultado = self.procesar_archivo(archivo)
             resultados.append(resultado)
             self.resultados.append(resultado)
         
@@ -564,7 +564,7 @@ def insertar_n1_file(n1_json_path: str, modo_prueba: bool = True) -> bool:
         True si se insertó exitosamente, False en caso contrario
     """
     inserter = N1Inserter(modo_prueba=modo_prueba)
-    resultado = inserter.procesar_archivo_json(Path(n1_json_path))
+    resultado = inserter.procesar_archivo(Path(n1_json_path))
     return resultado.exito
 
 if __name__ == "__main__":
@@ -613,7 +613,7 @@ if __name__ == "__main__":
     
     # Crear insertador y procesar
     inserter = N1Inserter(modo_prueba=True)
-    resultado = inserter.procesar_archivo_json(test_file)
+    resultado = inserter.procesar_archivo(test_file)
     
     # Mostrar resultado
     print(f"✅ Test inserción N1: {'ÉXITO' if resultado.exito else 'ERROR'}")

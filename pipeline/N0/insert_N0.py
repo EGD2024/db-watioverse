@@ -72,7 +72,7 @@ class N0Inserter:
         
         logger.info(f"🚀 Insertador N0 inicializado - Modo: {'PRUEBA' if modo_prueba else 'PRODUCCIÓN'}")
         
-        # Mapeo de tablas a funciones de mapeo
+        # Mapeo de tablas a funciones de mapeo - EXPANDIDO CON NUEVAS TABLAS
         self.tabla_mapper = {
             'client': self.mapeos.mapear_datos_client,
             'provider': self.mapeos.mapear_datos_provider,
@@ -83,7 +83,10 @@ class N0Inserter:
             'power_term': self.mapeos.mapear_datos_power_term,
             'invoice': self.mapeos.mapear_datos_invoice,
             'metadata': self.mapeos.mapear_datos_metadata,
-            'documents': self.mapeos.mapear_datos_documents
+            'documents': self.mapeos.mapear_datos_documents,
+            'metering': self.mapeos.mapear_datos_metering,
+            'sustainability': self.mapeos.mapear_datos_sustainability,
+            'invoice_summary': self.mapeos.mapear_datos_invoice_summary
         }
     
     def procesar_archivo(self, archivo_path: Path) -> ResultadoInsercion:
@@ -325,6 +328,16 @@ def main():
             f.write(reporte)
         
         print(f"\n💾 Reporte guardado en: {archivo_reporte}")
+        
+        # Ejecutar auditoría de campos post-inserción
+        try:
+            sys.path.append(str(Path(__file__).parent.parent / 'shared'))
+            from campos_audit import CamposAuditor
+            auditor = CamposAuditor()
+            auditor.generar_reporte_completo()
+            logger.info("✅ Auditoría de campos completada")
+        except Exception as audit_error:
+            logger.warning(f"⚠️ Error en auditoría post-inserción: {audit_error}")
         
     except Exception as e:
         logger.error(f"❌ Error en procesamiento: {e}")
