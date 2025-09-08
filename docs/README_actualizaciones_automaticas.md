@@ -69,7 +69,7 @@ flowchart LR
     style ENR fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style C fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style CATMAP fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style D fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style D fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style E fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style F fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style G fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
@@ -77,7 +77,7 @@ flowchart LR
     
     style T1 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style T2 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T3 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T3 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style T4 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style T5 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style T6 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
