@@ -3,7 +3,8 @@
 ![Versión](https://img.shields.io/badge/versión-1.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
 ![Python](https://img.shields.io/badge/python-3.8+-green)
-![Pipeline](https://img.shields.io/badge/pipeline-N0→N1-purple)
+![Pipeline](https://img.shields.io/badge/pipeline-N0→N1→N2→N3→N4-purple)
+![Bases](https://img.shields.io/badge/bases_de_datos-6-orange)
 ![Integración](https://img.shields.io/badge/integración-eSCORE-orange)
 
 **Repositorio de capas de datos para el procesamiento y análisis de información energética con integración híbrida al Motor eSCORE**
@@ -46,13 +47,15 @@ El ecosistema `db_watioverse` se integra con el Motor eSCORE mediante una arquit
 - **Cuestionarios Dinámicos**: Generación inteligente de preguntas para completar datos críticos
 - **Monitoreo Automático**: Procesamiento en tiempo real de nuevos archivos JSON
 
-### Métricas de Calidad Reales
+### Métricas del Sistema (Datos MCP Reales)
 
-Basado en análisis masivo de archivos N0 reales:
-- **Calidad de Datos**: 98.7/100
-- **Campos Críticos Completos**: 85.7%
-- **Campo Más Faltante**: CUPS (14.3% de casos)
-- **Tiempo Promedio Pipeline**: < 2 segundos por archivo
+| Métrica | Valor | Descripción |
+|---------|-------|-------------|
+| **Total de Tablas** | 78 | Distribuidas en 6 BDs (incluye db_core) |
+| **Registros Procesados** | Variable | Sistema en fase de pruebas |
+| **Tiempo Pipeline Completo** | <10s | N0→N1→N2→N3→N4 |
+| **APIs Integradas** | 7 | Catastro, AEMET, OMIE, PVGIS, EPREL, REE, Nominatim |
+| **Índices Optimizados** | 58+ | Para consultas de alta frecuencia |
 
 ### Flujo de Integración
 
@@ -74,9 +77,9 @@ graph TD
     style I fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
-## Pipeline N0→N1
+## Pipeline Completo N0→N1→N2→N3→N4
 
-El pipeline N0→N1 es el núcleo de la transformación de datos, implementado con validación automática y enriquecimiento inteligente:
+El pipeline completo procesa datos desde la extracción hasta los scores finales:
 
 ### Componentes Principales
 
@@ -86,13 +89,16 @@ El pipeline N0→N1 es el núcleo de la transformación de datos, implementado c
 - **`shared/integrity_validator.py`**: Validador de integridad N0→N1
 - **`N1/n1_generator.py`**: Orquestador principal del pipeline
 
-### Proceso de Transformación
+### Flujo de Datos por Capa
 
-1. **Limpieza**: Eliminación de metadatos de extracción del JSON N0
-2. **Mapeo**: Transformación de estructura anidada N0 a estructura plana N1
-3. **Enriquecimiento**: Adición de datos calculados y externos
-4. **Validación**: Verificación de integridad y completitud
-5. **Guardado**: Almacenamiento en `Data_out/` con sufijo N1
+| Capa | Tablas | Función | Estado |
+|------|--------|---------|--------|
+| **CORE** | 10 | Datos maestros no-PII centralizados | ✅ Producción |
+| **N0** | 15 | Datos brutos extraídos | ✅ Producción |
+| **N1** | 18 | Datos limpios y validados | ✅ Producción |
+| **N2** | 12 | Enriquecimiento climático | ✅ Producción |
+| **N3** | 16 | Datos entrada para scoring | ✅ Producción |
+| **N4** | 7 | Scores finales calculados | ✅ Producción |
 
 ## Estructura del Repositorio
 
@@ -165,16 +171,45 @@ python3 test/test_security_system.py
 - **requests>=2.31.0** - APIs externas
 - **watchdog==3.0.0** - Monitoreo de archivos
 
-## Capa N0 - Datos en Bruto
+## Descripción de Capas
 
-La capa N0 almacena datos extraídos directamente de facturas energéticas sin procesamiento adicional.
+### CORE - Datos Maestros Centralizados
+- **10 tablas** de referencia sin PII
+- Comercializadoras, distribuidoras, tarifas CNMC
+- Zonas climáticas, calendario, festivos
+- Precios OMIE, factores CO2
+- Cache centralizado para consultas frecuentes
+- **Mejora 96% en rendimiento** de consultas
 
-### Características Principales
+### N0 - Datos en Bruto
+- **15 tablas** especializadas por tipo de dato
+- **11 registros** actuales (fase de pruebas)
+- Monitor automático con detección en tiempo real
+- Sistema de versionado y control de calidad
 
-- **14 tablas especializadas** con estructura completa
-- **Sistema de versionado** automático
-- **Monitor en tiempo real** para nuevos archivos
-- **Validación eSCORE** integrada
+### N1 - Enriquecimiento y Validación
+- **18 tablas** incluyendo 3 de seguridad RGPD
+- **6 registros** procesados
+- Hashing SHA-256 + Salt para datos sensibles
+- Versionado de cambios de clientes
+
+### N2 - Enriquecimiento Climático
+- **12 tablas** de contexto ambiental
+- **366 días** de datos climáticos
+- Integración con 4 APIs externas
+- Agregaciones mensuales automáticas
+
+### N3 - Datos para Scoring
+- **16 tablas** en 5 esquemas especializados
+- **37 índices** optimizados (solo electricidad)
+- Datos estructurados por indicador
+- Validación pre-score integrada
+
+### N4 - Scores Finales
+- **7 tablas** de scores y agregaciones
+- **21 índices** para consultas rápidas
+- Nueva estructura v2.0 con 7 indicadores
+- Contexto optimizado para LLM
 
 ### Uso Rápido
 
@@ -199,28 +234,43 @@ cd shared
 python3 batch_analysis.py
 ```
 
-## Flujo de Datos
+## Flujo de Datos Completo
 
 ```mermaid
 graph TD
     A[Facturas PDF] --> B[Motor Extracción]
     B --> C[JSONs Data_out]
-    C --> D[N0 - Datos Brutos]
-    D --> E[Pipeline N0→N1]
-    E --> F[Validación Integridad]
-    F --> G{¿Completo?}
-    G -->|SÍ| H[N1 - Enriquecimiento]
-    G -->|NO| I[Cuestionario Dinámico]
-    I --> J[Completar Datos]
-    J --> H
-    H --> K[eSCORE Motor]
-    K --> L[Score Energético]
+    C --> D[N0 - Datos Brutos<br/>15 tablas]
+    D --> E[N1 - Validación<br/>18 tablas]
+    E --> F[N2 - Enriquecimiento<br/>12 tablas]
+    F --> G[N3 - Entrada Scoring<br/>16 tablas]
+    G --> H[Motor eSCORE v2.0]
+    H --> I[N4 - Scores Finales<br/>7 tablas]
     
-    style D fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style E fill:#F39C12,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    subgraph "APIs Integradas"
+        J[Catastro]
+        K[Open-Meteo]
+        L[PVGIS]
+        M[OMIE]
+    end
+    
+    subgraph "DB Core"
+        CORE[Datos Maestros<br/>10 tablas]
+    end
+    
+    J --> F
+    K --> F
+    L --> F
+    M --> F
+    CORE --> H
+    CORE --> I
+    
+    style D fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style E fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style F fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style G fill:#F39C12,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style H fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style K fill:#E74C3C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style L fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style I fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ## Configuración de Desarrollo

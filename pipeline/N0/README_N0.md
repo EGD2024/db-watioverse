@@ -6,8 +6,8 @@
 
 ![Versión](https://img.shields.io/badge/versión-1.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
-![Tipo](https://img.shields.io/badge/tipo-PostgreSQL-336791)
-![Capa](https://img.shields.io/badge/capa-N0_Raw-orange)
+![Tablas](https://img.shields.io/badge/tablas-15-purple)
+![Registros](https://img.shields.io/badge/registros_actuales-11-orange)
 
 **Módulo:** db_watioverse/N0  
 **Proyecto interno de Energy Green Data**
@@ -60,7 +60,7 @@ graph TD
 
 ### Tablas Principales
 
-La base de datos N0 contiene **14 tablas especializadas** que almacenan todos los aspectos de las facturas energéticas:
+La base de datos N0 contiene **15 tablas especializadas** que almacenan todos los aspectos de las facturas energéticas (datos reales de MCP):
 
 | Tabla | Campos Principales | Propósito |
 |-------|-------------------|-----------|

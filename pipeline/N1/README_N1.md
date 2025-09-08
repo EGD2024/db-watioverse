@@ -55,7 +55,7 @@ graph TD
     style D fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style H fill:#27AE60,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style I fill:#E74C3C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style J fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style J fill:#8E44AD,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ---
