@@ -164,8 +164,8 @@ graph LR
 -- Obtener tarifa vigente
 SELECT * FROM get_tarifa_vigente('2.0TD', '2024-09-01');
 
--- Obtener zona climática
-SELECT get_zona_climatica('28001'); -- Returns: 'D3'
+-- Obtener zona climática CTE (Anejo B)
+SELECT public.get_zona_climatica_cte('Madrid', 650); -- Returns: 'D3'
 ```
 
 ### Vista Materializada
