@@ -27,12 +27,16 @@ Sistema automático para mantener actualizados los precios energéticos y refere
 
 ```mermaid
 flowchart LR
-    subgraph REE[REE API]
-        A[[Precios OMIE day-ahead]]
+    subgraph APIs[APIs Externas]
+        A[[REE: Precios OMIE day-ahead]]
+        CAT[[OVC Catastro]]
     end
 
     A -->|18:18 Ingesta day-ahead| B[(db_sistema_electrico.omie_precios)]
     B -->|FDW| C[(db_Ncore.core_precios_omie_diario)]
+    
+    CAT -->|04:15 Fetch RC+DNP| ENR[(db_enriquecimiento.catastro_inmuebles)]
+    ENR -->|04:30 Sync mapeo| CATMAP[(core_catastro_map_uso_escore)]
 
     subgraph Ncore[db_Ncore]
         C --> C2{{Monitor 18:36}}
@@ -40,6 +44,8 @@ flowchart LR
         E[(core_calendario_horario)]
         F[(core_precio_regulado_boe)]
         G[(core_peajes_acceso)]
+        CATMAP[(core_catastro_map_uso_escore)]
+        CAT2{{Monitor 04:35}}
         MV[[mv_tarifas_vigentes]]
     end
 
@@ -47,10 +53,14 @@ flowchart LR
     E -. Calendario 03:00 .-> E
     F -. BOE 03:15 .-> F
     F -->|03:15 recálculo| G --> MV
+    CATMAP --> CAT2
 
     style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style CAT fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style B fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style ENR fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style C fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style CATMAP fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style D fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style E fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style F fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
