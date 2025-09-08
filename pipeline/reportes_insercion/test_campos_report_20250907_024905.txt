@@ -1,0 +1,21 @@
+TEST CAMPOS N0 - 2025-09-07 02:49:05
+================================================================================
+Campos JSON N0:     244
+Campos BD N0:       362
+Registros BD N0:    9
+
+Detalle por tabla:
+  client: 5 campos, 1 registros
+  contract: 22 campos, 1 registros
+  direccion_fiscal: 12 campos, 0 registros
+  documents: 14 campos, 1 registros
+  energy_consumption: 15 campos, 1 registros
+  invoice: 206 campos, 0 registros
+  invoice_summary: 11 campos, 0 registros
+  metadata: 20 campos, 1 registros
+  metering: 16 campos, 1 registros
+  power_term: 13 campos, 1 registros
+  provider: 5 campos, 1 registros
+  supply_address: 12 campos, 0 registros
+  supply_point: 2 campos, 0 registros
+  sustainability: 9 campos, 1 registros

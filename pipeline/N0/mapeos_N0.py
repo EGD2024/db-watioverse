@@ -119,7 +119,26 @@ class MapeosN0:
             'web_proveedor': provider_data.get('web_proveedor'),
             'entidad_bancaria': provider_data.get('entidad_bancaria'),
             'datos_bancarios_iban': provider_data.get('datos_bancarios_iban')
-            # NOTA: direccion_fiscal_* NO existe en esquema BD real - datos van a tabla direccion_fiscal
+        }
+    
+    def mapear_datos_direccion_fiscal(self, datos_json: dict) -> Dict[str, Any]:
+        """Mapea dirección fiscal desde JSON a tabla direccion_fiscal - CREADO."""
+        provider_data = self.extraer_valor_seguro(datos_json, 'provider', {})
+        direccion_data = self.extraer_valor_seguro(provider_data, 'direccion_fiscal', {})
+        
+        return {
+            'provider_id': None,  # Se asociará posteriormente
+            'codigo_postal': direccion_data.get('codigo_postal'),
+            'comunidad_autonoma': direccion_data.get('comunidad_autonoma'),
+            'municipio': direccion_data.get('municipio'),
+            'nombre_via': direccion_data.get('nombre_via'),
+            'numero': direccion_data.get('numero'),
+            'pais': direccion_data.get('pais'),
+            'planta': direccion_data.get('planta'),
+            'poblacion': direccion_data.get('poblacion'),
+            'provincia': direccion_data.get('provincia'),
+            'puerta': direccion_data.get('puerta'),
+            'tipo_via': direccion_data.get('tipo_via')
         }
     
     def mapear_datos_supply_point(self, datos_json: dict) -> Dict[str, Any]:

@@ -56,7 +56,7 @@ class TestCampos:
             conn = db_manager.get_connection('N0')
             cursor = conn.cursor()
             
-            # Consulta directa de esquema
+            # Consulta directa de esquema - CORREGIDO: excluir id y created_at
             cursor.execute("""
                 SELECT table_name, column_name, data_type, is_nullable
                 FROM information_schema.columns 
@@ -65,6 +65,7 @@ class TestCampos:
                                   'contract', 'energy_consumption', 'power_term', 'invoice', 
                                   'metadata', 'documents', 'metering', 'sustainability', 'invoice_summary',
                                   'direccion_fiscal')
+                AND column_name NOT IN ('id', 'created_at')
                 ORDER BY table_name, ordinal_position
             """)
             

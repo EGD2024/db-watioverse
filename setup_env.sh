@@ -67,6 +67,12 @@ DB_N2_NAME=db_N2
 DB_N2_USER=postgres
 DB_N2_PASSWORD=tu_password_aqui
 
+DB_N3_HOST=localhost
+DB_N3_PORT=5432
+DB_N3_NAME=db_N3
+DB_N3_USER=postgres
+DB_N3_PASSWORD=tu_password_aqui
+
 # Bases auxiliares críticas
 DB_CATASTRO_HOST=localhost
 DB_CATASTRO_PORT=5432

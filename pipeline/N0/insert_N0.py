@@ -76,6 +76,7 @@ class N0Inserter:
         self.tabla_mapper = {
             'client': self.mapeos.mapear_datos_client,
             'provider': self.mapeos.mapear_datos_provider,
+            'direccion_fiscal': self.mapeos.mapear_datos_direccion_fiscal,  # AGREGADO
             'supply_point': self.mapeos.mapear_datos_supply_point,
             'supply_address': self.mapeos.mapear_datos_supply_address,
             'contract': self.mapeos.mapear_datos_contract,
