@@ -25,6 +25,7 @@ import os
 import sys
 import time
 import argparse
+from datetime import datetime, timedelta
 import requests
 import xml.etree.ElementTree as ET
 import psycopg2
@@ -35,15 +36,15 @@ DB_USER = os.getenv('DB_USER', 'postgres')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'admin')
 
 URL_RC_BY_COORD = (
-    "https://ovc.catastro.meh.es/ovcservweb/ovcswlocalizacionrc/"
-    "ovccallejerocodigos.asmx/ConsultaRCCoor"
+    "http://ovc.catastro.meh.es/ovcservweb/OVCCoordenadas.asmx/Consulta_RCCOOR"
 )
 URL_DNP_BY_RC = (
-    "https://ovc.catastro.meh.es/ovcservweb/OVCServWeb.asmx/Consulta_DNPRC"
+    "http://ovc.catastro.meh.es/ovcservweb/OVCServWeb.asmx/Consulta_DNPRC"
 )
 
 HEADERS = {
-    'User-Agent': 'EGD-Ncore/1.0 (+https://energygreendata.internal)'
+    'User-Agent': 'EGD-Ncore/1.0 (+https://energygreendata.internal)',
+    'Accept': 'text/xml,application/xml,*/*;q=0.9'
 }
 
 
@@ -51,51 +52,72 @@ def get_conn(dbname: str):
     return psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database=dbname)
 
 
-def select_targets(conn_n2, max_rows: int):
-    """Selecciona CUPS con coordenadas y sin cache reciente."""
-    sql = """
-    WITH base AS (
-      SELECT cups, latitud, longitud
-      FROM public.coordenadas_geograficas_enriquecidas
-      WHERE latitud IS NOT NULL AND longitud IS NOT NULL
-    ), recientes AS (
-      SELECT cups, MAX(fecha_consulta) AS max_fecha
-      FROM db_enriquecimiento.public.catastro_inmuebles
-      GROUP BY cups
-    )
-    SELECT b.cups, b.latitud, b.longitud
-    FROM base b
-    LEFT JOIN recientes r USING (cups)
-    WHERE r.max_fecha IS NULL OR r.max_fecha < NOW() - INTERVAL '180 days'
-    LIMIT %s
-    """
+def select_targets(conn_n2, conn_enr, max_rows: int):
+    """Selecciona CUPS con coordenadas (N2) y sin cache reciente (enriquecimiento), sin cross-DB."""
+    # 1) CUPS con coordenadas en N2
     with conn_n2.cursor() as c:
-        c.execute(sql, (max_rows,))
-        return c.fetchall()  # list of (cups, lat, lon)
+        c.execute(
+            """
+            SELECT DISTINCT cups, latitud, longitud
+            FROM public.coordenadas_geograficas_enriquecidas
+            WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+            """
+        )
+        coords = c.fetchall()  # list of (cups, lat, lon)
+    if not coords:
+        return []
+    # 2) Recencia en cache de enriquecimiento
+    with conn_enr.cursor() as c2:
+        c2.execute(
+            """
+            SELECT cups, MAX(fecha_consulta) AS max_fecha
+            FROM public.catastro_inmuebles
+            GROUP BY cups
+            """
+        )
+        recency = {row[0]: row[1] for row in c2.fetchall()}
+    cutoff = datetime.now() - timedelta(days=180)
+    pending = []
+    for cups, lat, lon in coords:
+        last = recency.get(cups)
+        if last is None or last < cutoff:
+            pending.append((cups, lat, lon))
+            if len(pending) >= max_rows:
+                break
+    return pending
 
 
 def fetch_rc_by_coord(lat: float, lon: float):
-    params = { 'SRS': 'EPSG:4326', 'Coordenada_X': str(lon), 'Coordenada_Y': str(lat) }
-    r = requests.get(URL_RC_BY_COORD, params=params, headers=HEADERS, timeout=20)
-    if r.status_code != 200:
-        raise RuntimeError(f"OVC RC error HTTP {r.status_code}")
-    try:
-        root = ET.fromstring(r.text)
-    except ET.ParseError as e:
-        raise RuntimeError(f"OVC RC XML inválido: {e}")
-    # Buscar tags pc1/pc2 dentro de la estructura
-    pc1 = root.findtext('.//pc1')
-    pc2 = root.findtext('.//pc2')
-    if not pc1 or not pc2:
-        raise RuntimeError("OVC RC no devolvió pc1/pc2")
-    return pc1.strip(), pc2.strip()
+    # Primer intento: EPSG:4326
+    for srs in ('EPSG:4326', 'EPSG:4258'):
+        params = { 'SRS': srs, 'Coordenada_X': str(lon), 'Coordenada_Y': str(lat) }
+        r = requests.get(URL_RC_BY_COORD, params=params, headers=HEADERS, timeout=20)
+        if r.status_code != 200:
+            # Si 404/500, probar siguiente SRS; si ya probamos ambos, elevar con snippet
+            if srs == 'EPSG:4258':
+                snippet = r.text[:200] if r.text else ''
+                raise RuntimeError(f"OVC RC error HTTP {r.status_code} ({srs}) resp='{snippet}'")
+            continue
+        try:
+            root = ET.fromstring(r.text)
+        except ET.ParseError as e:
+            if srs == 'EPSG:4258':
+                raise RuntimeError(f"OVC RC XML inválido ({srs}): {e}")
+            continue
+        pc1 = root.findtext('.//pc1')
+        pc2 = root.findtext('.//pc2')
+        if pc1 and pc2:
+            return pc1.strip(), pc2.strip()
+        # Si no viene pc1/pc2, probar siguiente SRS
+    raise RuntimeError("OVC RC no devolvió pc1/pc2 en ninguno de los SRS probados")
 
 
 def fetch_details_by_rc(rc: str):
     params = { 'RC': rc }
     r = requests.get(URL_DNP_BY_RC, params=params, headers=HEADERS, timeout=20)
     if r.status_code != 200:
-        raise RuntimeError(f"OVC DNP error HTTP {r.status_code}")
+        snippet = r.text[:200] if r.text else ''
+        raise RuntimeError(f"OVC DNP error HTTP {r.status_code} resp='{snippet}'")
     try:
         root = ET.fromstring(r.text)
     except ET.ParseError as e:
@@ -160,7 +182,7 @@ def main():
 
     failures = []
     try:
-        targets = select_targets(n2, args.max)
+        targets = select_targets(n2, enr, args.max)
         if not targets:
             print('✅ No hay objetivos para cache de Catastro (ya actualizados)')
             return

@@ -31,11 +31,11 @@ flowchart LR
         A[[Precios OMIE day-ahead]]
     end
 
-    A -->|16:35 Ingesta day-ahead| B[(db_sistema_electrico.omie_precios)]
+    A -->|18:18 Ingesta day-ahead| B[(db_sistema_electrico.omie_precios)]
     B -->|FDW| C[(db_Ncore.core_precios_omie_diario)]
 
     subgraph Ncore[db_Ncore]
-        C --> C2{{Monitor 16:45}}
+        C --> C2{{Monitor 18:36}}
         D[(core_precios_omie)]
         E[(core_calendario_horario)]
         F[(core_precio_regulado_boe)]
@@ -58,48 +58,43 @@ flowchart LR
     style MV fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
-## ⏱️ Planificación Automática (cron)
+## ⏱️ Planificación Automática (launchd)
 
-| Proceso | Hora | Script |
+| Proceso | Hora | LaunchAgent |
 |---|---:|---|
-| Ingesta OMIE day-ahead (origen) | 16:35 | `pipeline/Ncore/jobs/ingest_omie_dayahead.sh` |
-| Sincronización OMIE (Ncore, incluye mañana) | 16:40 | `pipeline/Ncore/jobs/sync_omie_daily.sh` |
-| Monitor OMIE day-ahead (24h + agregado) | 16:45 | `pipeline/Ncore/jobs/monitor_omie_dayahead.sh` |
-| Verificación nocturna OMIE | 02:10 | `pipeline/Ncore/jobs/sync_omie_daily.sh` |
-| PVPC horario (30d incremental) | 02:15 | `pipeline/Ncore/jobs/sync_pvpc_incremental.sh` |
-| Calendario tarifario (14d incremental) | 03:00 | `pipeline/Ncore/jobs/sync_calendario_incremental.sh` |
-| BOE upsert + recálculo P1..P6 | 03:15 | `pipeline/Ncore/jobs/sync_boe_daily.sh` |
+| Ingesta OMIE day-ahead (origen) con 3 reintentos x5' y post-sync | 18:18 | `com.vagalume.omie.ingest_dayahead` |
+| Sincronización OMIE (Ncore, incluye mañana) | 18:31 | `com.vagalume.omie.sync_1640` |
+| Monitor OMIE day-ahead (24h + agregado) | 18:36 | `com.vagalume.omie.monitor_1645` |
+| Verificación nocturna OMIE (agregado) | 02:10 | `com.vagalume.omie.sync_0210` |
+| PVPC horario (30d incremental) | 02:15 | `com.vagalume.pvpc.sync_0215` |
+| Calendario tarifario (14d incremental) | 03:00 | `com.vagalume.calendario.sync_0300` |
+| BOE upsert + recálculo P1..P6 | 03:15 | `com.vagalume.boe.sync_0315` |
 
 Notas:
-- OMIE publica los precios del día siguiente sobre las 16:30. Se ingesta a las 16:35 y se sincroniza a Ncore a las 16:40. A las 16:45 se monitoriza (24 horas y agregado diario presentes).
-- La verificación nocturna a las 02:10 permite capturar revisiones si las hubiera.
+- OMIE publica los precios del día siguiente alrededor de las 16:30–17:00. Para evitar saturación, se programa la ingesta a las 18:18 con 3 intentos automáticos (cada 5 minutos) y sincronización inmediata a Ncore tras el primer intento exitoso.
+- La sincronización de respaldo se ejecuta a las 18:31 y el monitor valida a las 18:36 (23–25 horas en origen y agregado en Ncore).
+- La verificación nocturna a las 02:10 re-sincroniza por si hubiera revisiones.
 
-## 🧩 Scripts y SQL implicados
+## 🧩 Automatización instalada (LaunchAgents)
 
-- Ingesta OMIE day-ahead (origen `db_sistema_electrico`):
-  - `pipeline/Ncore/jobs/backfill_omie_from_ree.py` (ingesta desde REE; soporta day-ahead)
-  - `pipeline/Ncore/jobs/ingest_omie_dayahead.sh`
+- Ingesta OMIE day-ahead (origen `db_sistema_electrico`) con 3 reintentos x5' y post-sync a Ncore:
+  - `~/Library/LaunchAgents/com.vagalume.omie.ingest_dayahead.plist`
 
 - Sincronización OMIE (Ncore):
-  - `pipeline/Ncore/sql/sync_omie_daily.sql` (agregados diarios en EUR/MWh para ayer, hoy y mañana)
-  - `pipeline/Ncore/jobs/sync_omie_daily.sh`
+  - `~/Library/LaunchAgents/com.vagalume.omie.sync_1640.plist` (18:31)
+  - `~/Library/LaunchAgents/com.vagalume.omie.sync_0210.plist` (02:10)
 
 - PVPC horario (Ncore):
-  - `pipeline/Ncore/sql/sync_pvpc_incremental.sql`
-  - `pipeline/Ncore/jobs/sync_pvpc_incremental.sh`
+  - `~/Library/LaunchAgents/com.vagalume.pvpc.sync_0215.plist`
 
 - Calendario tarifario (Ncore):
-  - `pipeline/Ncore/sql/sync_calendario_incremental.sql`
-  - `pipeline/Ncore/jobs/sync_calendario_incremental.sh`
+  - `~/Library/LaunchAgents/com.vagalume.calendario.sync_0300.plist`
 
 - BOE peajes/cargos (Ncore):
-  - `pipeline/Ncore/sql/sync_boe_upsert.sql`
-  - `pipeline/Ncore/sql/recalc_peajes_periodos.sql` (incluye REFRESH `mv_tarifas_vigentes`)
-  - `pipeline/Ncore/jobs/sync_boe_daily.sh`
+  - `~/Library/LaunchAgents/com.vagalume.boe.sync_0315.plist` (incluye recálculo y REFRESH `mv_tarifas_vigentes`)
 
-- Monitor OMIE day-ahead:
-  - `pipeline/Ncore/jobs/monitor_omie_dayahead.py`
-  - `pipeline/Ncore/jobs/monitor_omie_dayahead.sh`
+Observación:
+- Los LaunchAgents ejecutan one‑liners `psql`/`curl`/`jq` y no dependen de ficheros `.sh` o `.sql` del repositorio. Los nombres de BD y tablas son reales (sin alias) tal y como exige la operativa.
 
 ## 🔍 Consultas de Verificación
 
