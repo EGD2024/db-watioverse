@@ -33,22 +33,37 @@ def get_conn(dbname: str):
     return psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database=dbname)
 
 
-def find_pending_cups(conn_n2, max_rows: int):
-    sql = """
-    WITH pendientes AS (
-      SELECT DISTINCT c.cups
-      FROM db_enriquecimiento.public.catastro_inmuebles c
-      WHERE c.cups IS NOT NULL AND TRIM(c.cups) <> ''
-    )
-    SELECT p.cups
-    FROM pendientes p
-    LEFT JOIN public.n2_catastro_inmueble n2 ON n2.cups = p.cups
-    WHERE n2.cups IS NULL OR n2.updated_at < NOW() - INTERVAL '180 days'
-    LIMIT %s
-    """
+def find_pending_cups(conn_enr, conn_n2, max_rows: int):
+    # 1. Obtener CUPS con datos en cache (db_enriquecimiento)
+    with conn_enr.cursor() as c:
+        c.execute(
+            """
+            SELECT DISTINCT cups
+            FROM public.catastro_inmuebles
+            WHERE cups IS NOT NULL AND TRIM(cups) <> ''
+            """
+        )
+        cached_cups = {r[0] for r in c.fetchall()}
+    
+    if not cached_cups:
+        return []
+    
+    # 2. Ver cuáles ya están en N2 y son recientes
     with conn_n2.cursor() as c:
-        c.execute(sql, (max_rows,))
-        return [r[0] for r in c.fetchall()]
+        c.execute(
+            """
+            SELECT cups
+            FROM public.n2_catastro_inmueble
+            WHERE cups = ANY(%s)
+              AND updated_at >= NOW() - INTERVAL '180 days'
+            """,
+            (list(cached_cups),)
+        )
+        recent_n2 = {r[0] for r in c.fetchall()}
+    
+    # 3. Filtrar pendientes
+    pending = list(cached_cups - recent_n2)
+    return pending[:max_rows]
 
 
 def fetch_cache_row(conn_enr, cups: str):
@@ -105,7 +120,7 @@ def main():
     enr = get_conn('db_enriquecimiento')
     n2 = get_conn('db_N2')
     try:
-        pending = find_pending_cups(n2, args.max)
+        pending = find_pending_cups(enr, n2, args.max)
         if not pending:
             print('✅ No hay CUPS pendientes o desactualizados para Catastro (N2)')
             return

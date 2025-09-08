@@ -96,9 +96,13 @@ flowchart LR
 | PVPC horario (30d incremental) | 02:15 | `com.vagalume.pvpc.sync_0215` |
 | Calendario tarifario (14d incremental) | 03:00 | `com.vagalume.calendario.sync_0300` |
 | BOE upsert + recálculo P1..P6 | 03:15 | `com.vagalume.boe.sync_0315` |
-| Catastro OVC fetch (50 CUPS/día) con 3 reintentos x5' | 04:15 | `com.vagalume.catastro.fetch_ovc` |
-| Catastro sync mapeo uso_escore | 04:30 | `com.vagalume.catastro.sync_ncore` |
-| Catastro monitor (alerta si sin datos) | 04:35 | `com.vagalume.catastro.monitor` |
+| Catastro cache OVC (50 CUPS/día con coord) | 04:15 | `com.vagalume.catastro.fetch_ovc` |
+| Catastro diccionarios Ncore (64 usos oficiales) | 04:20 | `com.vagalume.catastro.build_dictionaries` |
+| Catastro mapeo uso→categoría eSCORE | 04:25 | `com.vagalume.catastro.build_mapping` |
+| Catastro promoción N2 (superficie kWh/m²) | 04:30 | `com.vagalume.catastro.fetch_n2` |
+| <span style="color:#1ABC9C">**REE mix/CO2**</span> | <span style="color:#1ABC9C">**02:20**</span> | `com.vagalume.ree.mixco2.ingest` |
+| <span style="color:#1ABC9C">**PVGIS irradiancia**</span> | <span style="color:#1ABC9C">**04:45**</span> | `com.vagalume.pvgis.ingest` |
+| <span style="color:#1ABC9C">**Zonas climáticas HDD/CDD**</span> | <span style="color:#1ABC9C">**01:05**</span> | `com.vagalume.zonas_climaticas.load_overnight` |
 
 Notas:
 - OMIE publica los precios del día siguiente alrededor de las 16:30–17:00. Para evitar saturación, se programa la ingesta a las 18:18 con 3 intentos automáticos (cada 5 minutos) y sincronización inmediata a Ncore tras el primer intento exitoso.
@@ -123,13 +127,36 @@ Notas:
 - BOE peajes/cargos (Ncore):
   - `~/Library/LaunchAgents/com.vagalume.boe.sync_0315.plist` (incluye recálculo y REFRESH `mv_tarifas_vigentes`)
 
-- Catastro OVC (enriquecimiento → Ncore):
-  - `~/Library/LaunchAgents/com.vagalume.catastro.fetch_ovc.plist` (04:15) - Fetch desde OVC con 3 reintentos x5'
-  - `~/Library/LaunchAgents/com.vagalume.catastro.sync_ncore.plist` (04:30) - Sincronización mapeo uso_escore
-  - `~/Library/LaunchAgents/com.vagalume.catastro.monitor.plist` (04:35) - Monitor con alertas
+- Catastro OVC (enriquecimiento → N2 + Ncore):
+  - `~/Library/LaunchAgents/com.vagalume.catastro.fetch_ovc.plist` (04:15) - Cache OVC→db_enriquecimiento
+  - `~/Library/LaunchAgents/com.vagalume.catastro.build_dictionaries.plist` (04:20) - 64 usos oficiales→Ncore
+  - `~/Library/LaunchAgents/com.vagalume.catastro.build_mapping.plist` (04:25) - Mapeo uso→categoría eSCORE
+  - `~/Library/LaunchAgents/com.vagalume.catastro.fetch_n2.plist` (04:30) - Promoción superficie→N2
+
+- REE mix/CO2 (Ncore):
+  - `~/Library/LaunchAgents/com.vagalume.ree.mixco2.ingest.plist` (02:20) - Mix generación y emisiones→Ncore
+
+- PVGIS irradiancia (Ncore):
+  - `~/Library/LaunchAgents/com.vagalume.pvgis.ingest.plist` (04:45) - Radiación mensual kWh/m²→Ncore
+
+- Zonas climáticas HDD/CDD (Ncore):
+  - `~/Library/LaunchAgents/com.vagalume.zonas_climaticas.load_overnight.plist` (01:05) - 11,830 CP con HDD/CDD→Ncore
 
 Observación:
 - Los LaunchAgents ejecutan one‑liners `psql`/`curl`/`jq` y no dependen de ficheros `.sh` o `.sql` del repositorio. Los nombres de BD y tablas son reales (sin alias) tal y como exige la operativa.
+
+## ❓ ¿Por qué precargar en Ncore y no llamar a las APIs en tiempo real?
+
+- Respuesta inmediata y estable: eSCORE (N3) lee N1+N2 locales, sin depender de latencias, timeouts o cuotas de terceros.
+- Resiliencia: si REE/OMIE/OVC caen o limitan, el sistema sigue operativo con los datos ya precargados.
+- Idempotencia y reproducibilidad: guardamos RAW+normalizado; mismo input ⇒ mismo resultado, con auditoría y re‑cálculo garantizado.
+- Normalización multisource: unificamos unidades y reglas (p. ej., derivación CTE por altitud) antes de exponer a N3.
+- Auditoría y trazabilidad: tablas `core_*` con timestamps explicables sin “viajar” a la API.
+- Coste y gobernanza: menos llamadas repetidas; ventanas y frecuencias controladas por nosotros.
+- Seguridad y cumplimiento: evitamos exponer PII a terceros en scoring; enriquecimiento controlado en N2.
+- Escalabilidad: precómputo diario/horario sirve miles de scores concurrentes sin pegar a fuentes externas.
+- Verificación automática: garantizamos cobertura (23–25 horas) y checks de integridad antes de publicar.
+- Arquitectura por capas: N0→N1→N2→N3; N3 nunca habla con APIs, solo con datasets validados.
 
 ## 🔍 Consultas de Verificación
 
@@ -155,9 +182,56 @@ ORDER BY fecha;
 - Verificación PVPC (últimos 30 días):
 
 ```sql
-SELECT MIN(timestamp_hora) AS min_ts, MAX(timestamp_hora) AS max_ts, COUNT(*) AS registros
-FROM core_precios_omie
-WHERE timestamp_hora >= CURRENT_DATE - INTERVAL '30 days';
+-- Cobertura PVPC últimos 30 días (tabla de precio regulado en Ncore)
+SELECT MIN(fecha_hora) AS min_ts, MAX(fecha_hora) AS max_ts, COUNT(*) AS registros
+FROM core_precio_regulado_boe
+WHERE fecha_hora >= CURRENT_DATE - INTERVAL '30 days';
+```
+
+- Verificación REE mix (tecnologías generación):
+
+```sql
+-- Mix horario por tecnología (ayer)
+SELECT date(fecha_hora) AS dia, tecnologia, COUNT(*) AS horas, 
+       ROUND(AVG(porcentaje),1) AS pct_medio
+FROM core_ree_mix_horario
+WHERE fecha_hora >= CURRENT_DATE - INTERVAL '1 day'
+  AND fecha_hora < CURRENT_DATE
+GROUP BY 1, 2
+ORDER BY pct_medio DESC LIMIT 10;
+```
+
+- Verificación REE emisiones CO2:
+
+```sql
+-- Debe devolver 23-25 horas (maneja DST)
+SELECT date_trunc('day', fecha_hora) AS dia, COUNT(*) AS horas,
+       ROUND(AVG(gco2_kwh),1) AS gco2_medio
+FROM core_ree_emisiones_horario
+WHERE fecha_hora >= CURRENT_DATE - INTERVAL '1 day'
+GROUP BY 1;
+```
+
+- Verificación PVGIS (irradiancia mensual):
+
+```sql
+-- Cobertura por mes y coords únicas
+SELECT mes, COUNT(DISTINCT (latitud, longitud)) AS coords,
+       ROUND(AVG(kwh_m2),1) AS kwh_m2_medio
+FROM core_pvgis_radiacion
+GROUP BY mes ORDER BY mes;
+```
+
+- Verificación zonas climáticas (HDD/CDD):
+
+```sql
+-- Distribución por provincia y zona CTE
+SELECT provincia, zona_climatica_cte, COUNT(*) AS municipios,
+       ROUND(AVG(hdd_anual_medio),0) AS hdd_medio,
+       ROUND(AVG(cdd_anual_medio),0) AS cdd_medio
+FROM core_zonas_climaticas
+GROUP BY 1, 2
+ORDER BY 1, 2;
 ```
 
 ## 🧭 Notas de Operación

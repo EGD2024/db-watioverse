@@ -54,7 +54,7 @@ El ecosistema `db_watioverse` se integra con el Motor eSCORE mediante una arquit
 | **Total de Tablas** | 78 | Distribuidas en 6 BDs (incluye db_core) |
 | **Registros Procesados** | Variable | Sistema en fase de pruebas |
 | **Tiempo Pipeline Completo** | <10s | N0→N1→N2→N3→N4 |
-| **APIs Integradas** | 7 | Catastro, AEMET, OMIE, PVGIS, EPREL, REE, Nominatim |
+| **APIs Integradas** | 8 | Catastro (OVC), AEMET, OMIE, PVGIS, EPREL, REE, Nominatim, Open-Meteo |
 | **Índices Optimizados** | 58+ | Para consultas de alta frecuencia |
 
 ### Flujo de Integración
@@ -193,10 +193,12 @@ python3 test/test_security_system.py
 - Hashing SHA-256 + Salt para datos sensibles
 - Versionado de cambios de clientes
 
-### N2 - Enriquecimiento Climático
-- **12 tablas** de contexto ambiental
+### N2 - Enriquecimiento Climático y Catastral
+- **13 tablas** de contexto ambiental y catastral
 - **366 días** de datos climáticos
-- Integración con 4 APIs externas
+- **64 usos oficiales** del Catastro español
+- Integración con 5 APIs externas (incluye OVC Catastro)
+- Superficie construida para métricas kWh/m²
 - Agregaciones mensuales automáticas
 
 ### N3 - Datos para Scoring
@@ -242,16 +244,17 @@ graph TD
     B --> C[JSONs Data_out]
     C --> D[N0 - Datos Brutos<br/>15 tablas]
     D --> E[N1 - Validación<br/>18 tablas]
-    E --> F[N2 - Enriquecimiento<br/>12 tablas]
+    E --> F[N2 - Enriquecimiento<br/>13 tablas]
     F --> G[N3 - Entrada Scoring<br/>16 tablas]
     G --> H[Motor eSCORE v2.0]
     H --> I[N4 - Scores Finales<br/>7 tablas]
     
     subgraph "APIs Integradas"
-        J[Catastro]
+        J[Catastro OVC]
         K[Open-Meteo]
         L[PVGIS]
         M[OMIE]
+        N[Nominatim]
     end
     
     subgraph "DB Core"
@@ -262,6 +265,7 @@ graph TD
     K --> F
     L --> F
     M --> F
+    N --> F
     CORE --> H
     CORE --> I
     

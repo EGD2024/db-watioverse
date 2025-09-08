@@ -1,11 +1,11 @@
-# 🌡️ Base de Datos N2 - Capa de Enriquecimiento Climático
+# 🌡️ Base de Datos N2 - Capa de Enriquecimiento Climático y Catastral
 
 ![Versión](https://img.shields.io/badge/versión-1.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
-![Tablas](https://img.shields.io/badge/tablas-12-purple)
-![APIs](https://img.shields.io/badge/APIs_integradas-4-orange)
+![Tablas](https://img.shields.io/badge/tablas-13-purple)
+![APIs](https://img.shields.io/badge/APIs_integradas-5-orange)
 
-**Módulo:** Pipeline N2 - Enriquecimiento Climático y Contextual  
+**Módulo:** Pipeline N2 - Enriquecimiento Climático, Catastral y Contextual  
 **Proyecto interno de Energy Green Data**
 
 ---
@@ -23,14 +23,14 @@
 
 ## 🎯 Descripción General
 
-La base de datos N2 especializa en el enriquecimiento contextual con datos climáticos, solares y geográficos. Integra múltiples APIs externas para proporcionar contexto ambiental necesario para el cálculo de scores energéticos normalizados.
+La base de datos N2 especializa en el enriquecimiento contextual con datos climáticos, solares, catastrales y geográficos. Integra múltiples APIs externas para proporcionar contexto ambiental y superficie construida necesarios para el cálculo de scores energéticos normalizados (kWh/m² año).
 
 ### Características Principales
 
 | Característica | Valor | Descripción |
 |----------------|-------|-------------|
-| **Total de Tablas** | 12 | Especializadas en clima y contexto |
-| **APIs Integradas** | 4 | Open-Meteo, PVGIS, Catastro, AEMET |
+| **Total de Tablas** | 13 | Especializadas en clima, catastro y contexto |
+| **APIs Integradas** | 7 | Open-Meteo, PVGIS, Catastro OVC, AEMET, Nominatim, REE, EPREL (pendiente) |
 | **Cobertura Temporal** | 366 días | Datos diarios completos |
 | **Agregaciones** | Mensual | 13 meses de histórico |
 | **Tiempo de Enriquecimiento** | <5s | Por CUPS completo |
@@ -46,18 +46,22 @@ graph TD
     subgraph "APIs Externas"
         C[Open-Meteo API]
         D[PVGIS Solar API]
-        E[Catastro API]
+        E[Catastro OVC API]
         F[AEMET API]
+        G[REE API]
+        H[EPREL API]
     end
     
-    B --> G[Procesamiento<br/>Paralelo]
-    C --> G
-    D --> G
-    E --> G
-    F --> G
+    B --> J[Procesamiento<br/>Paralelo]
+    C --> J
+    D --> J
+    E --> J
+    F --> J
+    G --> J
+    H --> J
     
-    G --> H[Cache de<br/>Enriquecimiento]
-    H --> I[BD N2<br/>12 tablas]
+    J --> K[Cache de<br/>Enriquecimiento]
+    K --> L[BD N2<br/>13 tablas]
     I --> J[Motor eSCORE]
     
     style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
@@ -74,7 +78,7 @@ graph TD
 
 ## 💾 Estructura de la Base de Datos
 
-### Tablas Principales (12 tablas - datos MCP)
+### Tablas Principales (13 tablas - datos MCP)
 
 | Tabla | Columnas | Registros | Descripción |
 |-------|----------|-----------|-------------|
@@ -90,6 +94,7 @@ graph TD
 | **facturas_electricidad_enriquecidas** | 23 | 0 | Facturas con contexto |
 | **festivos_españa** | 13 | 15 | Calendario de festivos |
 | **informe_contextual_factura** | 24 | 1 | Informes generados |
+| **n2_catastro_inmueble** | 19 | Variable | Datos catastrales con superficie |
 
 ### Campos Clave para Normalización
 

@@ -29,11 +29,11 @@ La base de datos NCORE (db_Ncore) centraliza todos los datos maestros no-PII que
 
 | Característica | Valor | Descripción |
 |----------------|-------|-------------|
-| **Total de Tablas** | 10 | Datos maestros sin PII |
+| **Total de Tablas** | 13 | Datos maestros sin PII |
 | **Cache Centralizado** | ✅ | Consultas optimizadas |
 | **Actualización** | Automática | Triggers y funciones |
 | **Vistas Materializadas** | 1 | Tarifas vigentes |
-| **Funciones Helper** | 2 | Consultas frecuentes |
+| **Funciones Helper** | 3 | Consultas frecuentes + zona CTE |
 
 ---
 
@@ -49,6 +49,7 @@ graph TD
         E[Calendario]
         F[Precios OMIE]
         G[Factores CO2]
+        H[Diccionarios Catastro]
     end
     
     subgraph "Pipeline N0-N4"
@@ -68,6 +69,7 @@ graph TD
     E --> J
     F --> K
     G --> K
+    H --> J
     
     style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style B fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
@@ -76,6 +78,7 @@ graph TD
     style E fill:#E74C3C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style F fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style G fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style H fill:#8E44AD,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ---
@@ -96,6 +99,9 @@ graph TD
 | **core_precios_omie** | 11 | Histórico precios mercado | Diario |
 | **core_factores_emision** | 9 | Factores CO2 | Anual |
 | **core_coeficientes_conversion** | 9 | Conversión unidades | Estático |
+| **core_catastro_dic_uso** | 5 | 64 usos oficiales Catastro | Automático |
+| **core_catastro_map_uso_escore** | 3 | Mapeo uso→categoría eSCORE | Automático |
+| **core_catastro_dic_epoca_construccion** | 3 | 5 épocas CTE | Estático |
 
 ### Datos Clave Centralizados
 
@@ -133,7 +139,7 @@ graph LR
 |------|------------------------|-----------|
 | **N0** | comercializadoras, distribuidoras | Validación inicial |
 | **N1** | peajes_acceso, comercializadoras | Validación tarifaria |
-| **N2** | zonas_climaticas, calendario, festivos | Contexto ambiental |
+| **N2** | zonas_climaticas, calendario, festivos, catastro_dic_* | Contexto ambiental y catastral |
 | **N3** | precios_omie, factores_emision | Datos para scoring |
 | **N4** | Todas (referencia) | Contexto completo |
 

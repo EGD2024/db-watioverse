@@ -4,9 +4,11 @@
 
 Este documento identifica los campos obligatorios y opcionales necesarios para utilizar las herramientas de enriquecimiento de datos disponibles en el ecosistema:
 
-- **OMIE API**: Precios del mercado eléctrico español
-- **Google Maps API**: Geolocalización y datos geográficos  
-- **AEMET API**: Datos meteorológicos históricos
+- **OMIE**: Precios del mercado eléctrico español
+- **Nominatim (OSM)**: Geocodificación y datos geográficos  
+- **Open‑Meteo (AEMET equivalente)**: Datos meteorológicos históricos
+- **PVPC (BOE)**: Precio regulado (peajes/cargos)
+- **REE**: Mix eléctrico y factores de emisión CO2
 
 ## 1. API OMIE (Precios de Electricidad)
 
@@ -42,10 +44,10 @@ fecha_fin = "2025-05-07"
 precio_data = omie_api.obtener_precio_medio(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
 ```
 
-## 2. Google Maps API (Geolocalización)
+## 2. Nominatim (OSM) – Geolocalización
 
 ### Propósito
-Enriquecer direcciones con coordenadas geográficas, información administrativa y datos de ubicación.
+Enriquecer direcciones con coordenadas geográficas, información administrativa y datos de ubicación (sin API key).
 
 ### Campos Obligatorios
 | Campo | Tipo | Descripción | Origen en JSON N0 |
@@ -76,10 +78,11 @@ España
 ### Datos Enriquecidos Generados
 - `latitud`: Coordenada latitud (decimal)
 - `longitud`: Coordenada longitud (decimal)
-- `precision_geocoding`: Nivel de precisión (ROOFTOP, RANGE_INTERPOLATED, etc.)
-- `tipo_ubicacion`: Tipo de lugar (residential, commercial, etc.)
-- `zona_climatica`: Zona climática española (A, B, C, D, E)
-- `altitud_estimada`: Altitud sobre el nivel del mar (metros)
+- `direccion_normalizada`: Display name OSM
+- `osm_class` / `osm_type` / `importance`
+- `tipo_ubicacion`: Inferido de OSM
+- `zona_climatica`: Zona climática CTE (por coordenadas)
+- `altitud_msnm`: Altitud sobre el nivel del mar (si disponible)
 
 ### Ejemplo de Uso
 ```python
@@ -87,8 +90,8 @@ España
 direccion = f"{supply_point['datos_suministro']['direccion_suministro']['tipo_via']} {supply_point['datos_suministro']['direccion_suministro']['nombre_via']} {supply_point['datos_suministro']['direccion_suministro']['numero']}"
 cp = supply_point['datos_suministro']['direccion_suministro']['codigo_postal']
 
-# Llamada a Google Maps
-geo_data = google_maps_api.geocode(direccion, cp)
+# Llamada a Nominatim
+geo_data = nominatim_api.search(direccion, cp)
 ```
 
 ## 3. AEMET API (Datos Meteorológicos)

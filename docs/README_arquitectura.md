@@ -33,7 +33,7 @@ El sistema gestiona 23 bases de datos especializadas organizadas en 5 capas func
 graph TD
     subgraph "CAPA 1: Pipeline"
         A[db_N0<br/>14 tablas] --> B[db_N1<br/>14 tablas]
-        B --> C[db_N2<br/>12 tablas]
+        B --> C[db_N2<br/>13 tablas]
     end
     
     subgraph "CAPA 2: Enriquecimiento"
@@ -110,7 +110,7 @@ sequenceDiagram
 |------|---------------|--------|---------|
 | **Pipeline** | db_N0 | 14 | Datos brutos extraídos |
 | | db_N1 | 14 | Datos limpios validados |
-| | db_N2 | 12 | Datos preparados scoring |
+| | db_N2 | 13 | Datos preparados scoring + superficie |
 | **Enriquecimiento** | db_enriquecimiento | 3 | Cache multi-dimensional |
 | | db_clima | 3-5 | Datos meteorológicos |
 | | db_catastro | 4 | Datos catastrales |
@@ -125,7 +125,7 @@ sequenceDiagram
 graph LR
     subgraph "Fuentes Externas"
         A[AEMET API<br/>Clima]
-        B[Catastro API<br/>Edificios]
+        B[Catastro OVC<br/>Superficie/Uso]
         C[OMIE API<br/>Precios]
     end
     
@@ -147,6 +147,38 @@ graph LR
 ```
 
 ### Estructura de Cache Multi-dimensional
+
+```sql
+-- Cache enriquecido con Catastro OVC
+SELECT 
+    ec.cups,
+    ec.tipo_dato,
+    ci.referencia_catastral,
+    ci.uso_principal,
+    ci.superficie_construida_m2,  -- Clave para kWh/m²
+    ec.datos_json
+FROM enrichment_cache ec
+LEFT JOIN catastro_inmuebles ci ON ci.cups = ec.cups
+WHERE ec.is_active = true;
+```
+
+### Flujo Catastro OVC → N2
+
+```mermaid
+graph TD
+    A[Coordenadas GPS<br/>desde N2] --> B[Catastro OVC API<br/>Consulta_RCCOOR_Distancia]
+    B --> C[Referencia Catastral]
+    C --> D[Catastro OVC API<br/>Consulta_DNPRC]
+    D --> E[Cache en<br/>db_enriquecimiento]
+    E --> F[Promoción a<br/>db_N2.n2_catastro_inmueble]
+    F --> G[eSCORE calcula<br/>kWh/m² año]
+    
+    style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style B fill:#E74C3C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style E fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style F fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style G fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
+```
 
 | Dimensión | Descripción | Ejemplo |
 |-----------|-------------|---------|
