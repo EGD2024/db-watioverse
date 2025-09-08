@@ -32,28 +32,36 @@ flowchart LR
         CAT[[OVC Catastro]]
     end
 
-    A -->|18:18 Ingesta day-ahead| B[(db_sistema_electrico.omie_precios)]
+    T1[18:18 Ingesta]
+    T2[04:15 Fetch]
+    T3[04:30 Sync]
+    T4[18:36 Monitor]
+    T5[02:15 PVPC]
+    T6[03:00 Calendario]
+    T7[03:15 BOE]
+    T8[04:35 Monitor]
+
+    A --> T1 --> B[(db_sistema_electrico.omie_precios)]
     B -->|FDW| C[(db_Ncore.core_precios_omie_diario)]
     
-    CAT -->|04:15 Fetch RC+DNP| ENR[(db_enriquecimiento.catastro_inmuebles)]
-    ENR -->|04:30 Sync mapeo| CATMAP[(core_catastro_map_uso_escore)]
+    CAT --> T2 --> ENR[(db_enriquecimiento.catastro_inmuebles)]
+    ENR --> T3 --> CATMAP[(core_catastro_map_uso_escore)]
 
     subgraph Ncore[db_Ncore]
-        C --> C2{{Monitor 18:36}}
+        C --> T4
         D[(core_precios_omie)]
         E[(core_calendario_horario)]
         F[(core_precio_regulado_boe)]
         G[(core_peajes_acceso)]
-        CATMAP[(core_catastro_map_uso_escore)]
-        CAT2{{Monitor 04:35}}
+        CATMAP
         MV[[mv_tarifas_vigentes]]
     end
 
-    D -. PVPC 02:15 .-> D
-    E -. Calendario 03:00 .-> E
-    F -. BOE 03:15 .-> F
-    F -->|03:15 recálculo| G --> MV
-    CATMAP --> CAT2
+    T5 -.-> D
+    T6 -.-> E
+    T7 -.-> F
+    F -->|recálculo| G --> MV
+    CATMAP --> T8
 
     style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style CAT fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
@@ -66,6 +74,15 @@ flowchart LR
     style F fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style G fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style MV fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
+    style T1 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T2 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T3 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T4 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T5 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T6 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T7 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T8 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ## ⏱️ Planificación Automática (launchd)

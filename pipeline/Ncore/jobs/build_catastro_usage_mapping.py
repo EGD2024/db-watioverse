@@ -58,6 +58,7 @@ EXACT = {
     'residencial': 'vivienda_plurifamiliar',
     'residencial unifamiliar': 'vivienda_unifamiliar',
     'residencial colectivo': 'vivienda_plurifamiliar',
+    'obras de urbanización y jardineria, suelos sin edificar': 'suelo_sin_edificar',
 }
 
 
