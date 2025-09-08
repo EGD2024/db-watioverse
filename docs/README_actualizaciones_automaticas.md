@@ -69,6 +69,9 @@ flowchart LR
 | PVPC horario (30d incremental) | 02:15 | `com.vagalume.pvpc.sync_0215` |
 | Calendario tarifario (14d incremental) | 03:00 | `com.vagalume.calendario.sync_0300` |
 | BOE upsert + recálculo P1..P6 | 03:15 | `com.vagalume.boe.sync_0315` |
+| Catastro OVC fetch (50 CUPS/día) con 3 reintentos x5' | 04:15 | `com.vagalume.catastro.fetch_ovc` |
+| Catastro sync mapeo uso_escore | 04:30 | `com.vagalume.catastro.sync_ncore` |
+| Catastro monitor (alerta si sin datos) | 04:35 | `com.vagalume.catastro.monitor` |
 
 Notas:
 - OMIE publica los precios del día siguiente alrededor de las 16:30–17:00. Para evitar saturación, se programa la ingesta a las 18:18 con 3 intentos automáticos (cada 5 minutos) y sincronización inmediata a Ncore tras el primer intento exitoso.
@@ -92,6 +95,11 @@ Notas:
 
 - BOE peajes/cargos (Ncore):
   - `~/Library/LaunchAgents/com.vagalume.boe.sync_0315.plist` (incluye recálculo y REFRESH `mv_tarifas_vigentes`)
+
+- Catastro OVC (enriquecimiento → Ncore):
+  - `~/Library/LaunchAgents/com.vagalume.catastro.fetch_ovc.plist` (04:15) - Fetch desde OVC con 3 reintentos x5'
+  - `~/Library/LaunchAgents/com.vagalume.catastro.sync_ncore.plist` (04:30) - Sincronización mapeo uso_escore
+  - `~/Library/LaunchAgents/com.vagalume.catastro.monitor.plist` (04:35) - Monitor con alertas
 
 Observación:
 - Los LaunchAgents ejecutan one‑liners `psql`/`curl`/`jq` y no dependen de ficheros `.sh` o `.sql` del repositorio. Los nombres de BD y tablas son reales (sin alias) tal y como exige la operativa.

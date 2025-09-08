@@ -36,10 +36,10 @@ DB_USER = os.getenv('DB_USER', 'postgres')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'admin')
 
 URL_RC_BY_COORD = (
-    "http://ovc.catastro.meh.es/ovcservweb/OVCCoordenadas.asmx/Consulta_RCCOOR"
+    "https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCoordenadas.svc/json/Consulta_RCCOOR_Distancia"
 )
 URL_DNP_BY_RC = (
-    "http://ovc.catastro.meh.es/ovcservweb/OVCServWeb.asmx/Consulta_DNPRC"
+    "https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc/json/Consulta_DNPRC"
 )
 
 HEADERS = {
@@ -88,52 +88,71 @@ def select_targets(conn_n2, conn_enr, max_rows: int):
 
 
 def fetch_rc_by_coord(lat: float, lon: float):
-    # Primer intento: EPSG:4326
-    for srs in ('EPSG:4326', 'EPSG:4258'):
-        params = { 'SRS': srs, 'Coordenada_X': str(lon), 'Coordenada_Y': str(lat) }
-        r = requests.get(URL_RC_BY_COORD, params=params, headers=HEADERS, timeout=20)
-        if r.status_code != 200:
-            # Si 404/500, probar siguiente SRS; si ya probamos ambos, elevar con snippet
-            if srs == 'EPSG:4258':
-                snippet = r.text[:200] if r.text else ''
-                raise RuntimeError(f"OVC RC error HTTP {r.status_code} ({srs}) resp='{snippet}'")
-            continue
-        try:
-            root = ET.fromstring(r.text)
-        except ET.ParseError as e:
-            if srs == 'EPSG:4258':
-                raise RuntimeError(f"OVC RC XML inválido ({srs}): {e}")
-            continue
-        pc1 = root.findtext('.//pc1')
-        pc2 = root.findtext('.//pc2')
-        if pc1 and pc2:
-            return pc1.strip(), pc2.strip()
-        # Si no viene pc1/pc2, probar siguiente SRS
-    raise RuntimeError("OVC RC no devolvió pc1/pc2 en ninguno de los SRS probados")
+    params = {'SRS': 'EPSG:4326', 'CoorX': str(lon), 'CoorY': str(lat)}
+    r = requests.get(URL_RC_BY_COORD, params=params, headers=HEADERS, timeout=20)
+    if r.status_code != 200:
+        raise RuntimeError(f"OVC RC error HTTP {r.status_code}")
+    try:
+        data = r.json()
+    except Exception as e:
+        raise RuntimeError(f"OVC RC JSON inválido: {e}")
+    result = data.get('Consulta_RCCOOR_DistanciaResult', {})
+    if result.get('control', {}).get('cucoor') == 1:
+        lpcd = result.get('coordenadas_distancias', {}).get('coordd', [{}])[0].get('lpcd', [])
+        if lpcd:
+            pc = lpcd[0].get('pc', {})
+            pc1 = pc.get('pc1')
+            pc2 = pc.get('pc2')
+            if pc1 and pc2:
+                # Construir RC completa de 20 chars: pc1(7) + pc2(7) + cargo(4) + control(2)
+                # Por defecto usamos 0001XX para propiedades principales
+                rc_completa = f"{pc1}{pc2}0001XX"
+                return rc_completa[:14], rc_completa[14:]  # Devolver pc1+pc2, cargo+control
+    raise RuntimeError("OVC RC no devolvió pc1/pc2")
 
 
 def fetch_details_by_rc(rc: str):
-    params = { 'RC': rc }
-    r = requests.get(URL_DNP_BY_RC, params=params, headers=HEADERS, timeout=20)
-    if r.status_code != 200:
-        snippet = r.text[:200] if r.text else ''
-        raise RuntimeError(f"OVC DNP error HTTP {r.status_code} resp='{snippet}'")
-    try:
-        root = ET.fromstring(r.text)
-    except ET.ParseError as e:
-        raise RuntimeError(f"OVC DNP XML inválido: {e}")
-
-    # Extraer uso y superficies (mejor esfuerzo, sin inventar)
-    # Campos frecuentes en DNP: <luso> (uso literal), <sfc> (superficie construida)
-    uso = (root.findtext('.//luso') or root.findtext('.//uso') or root.findtext('.//destino'))
-    # Superficie en m2
-    sfc = root.findtext('.//sfc') or root.findtext('.//superficie')
-    sup_const = None
-    try:
-        if sfc is not None:
-            sup_const = float(str(sfc).replace(',', '.'))
-    except Exception:
-        sup_const = None
+    # Intentar primero con RC completa, si falla intentar solo con pc1+pc2
+    for attempt_rc in [rc, rc[:14] if len(rc) > 14 else rc]:
+        params = {'RefCat': attempt_rc}
+        r = requests.get(URL_DNP_BY_RC, params=params, headers=HEADERS, timeout=20)
+        if r.status_code != 200:
+            continue
+        try:
+            data = r.json()
+        except Exception:
+            continue
+        
+        result = data.get('consulta_dnprcResult', {})
+        if result.get('control', {}).get('cuerr', 0) > 0:
+            continue  # Hay error, probar siguiente
+        
+        # Navegar con cuidado por la estructura anidada
+        bico = result.get('bico', {})
+        bi = bico.get('bi', {})
+        debi = bi.get('debi', {})
+        
+        # Si no hay debi, puede ser parcela rústica - buscar en dt
+        if not debi:
+            dt = bi.get('dt', {})
+            if dt:
+                # Parcela rústica: usar datos generales
+                uso = 'Rústico'
+                # Superficie de parcela en lugar de construida
+                sfc = dt.get('ssp', 0) if dt else 0
+            else:
+                uso = ''
+                sfc = 0
+        else:
+            uso = debi.get('luso', '')
+            sfc = debi.get('sfc', 0)
+        
+        sup_const = float(sfc) if sfc else None
+        if uso or sup_const:  # Si tenemos algo, devolver
+            return {'uso_principal': uso.strip() if uso else 'Sin uso definido', 'superficie_construida_m2': sup_const}
+    
+    # Si llegamos aquí, no pudimos obtener nada
+    raise RuntimeError(f"No se pudo obtener detalles para RC {rc}")
 
     return {
         'uso_principal': uso.strip() if uso else None,
@@ -188,8 +207,10 @@ def main():
             return
         for cups, lat, lon in targets:
             try:
-                pc1, pc2 = fetch_rc_by_coord(float(lat), float(lon))
-                detalles = fetch_details_by_rc(f"{pc1}{pc2}")
+                rc_base, rc_control = fetch_rc_by_coord(float(lat), float(lon))
+                pc1 = rc_base[:7]
+                pc2 = rc_base[7:14]
+                detalles = fetch_details_by_rc(f"{rc_base}{rc_control}")
                 # Validación mínima: si no hay uso o superficie, marcamos fallo explícito
                 if not detalles.get('uso_principal') or detalles.get('superficie_construida_m2') is None:
                     raise RuntimeError('Uso o superficie ausentes en DNP')
