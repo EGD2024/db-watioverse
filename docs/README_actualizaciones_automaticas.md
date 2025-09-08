@@ -30,86 +30,153 @@ flowchart LR
     subgraph APIs[APIs Externas]
         A[[REE: Precios OMIE day-ahead]]
         CAT[[OVC Catastro]]
+        REE2[[REE: Mix/CO2]]
+        PVGIS[[PVGIS: Radiación]]
     end
 
     T1[18:18 Ingesta]
     T2[04:15 Fetch]
     T3[04:30 Sync]
     T4[18:36 Monitor]
-    T5[02:15 PVPC]
-    T6[03:00 Calendario]
+    T5[05:30 PVPC Update]
+    T6[06:00 Sync All]
     T7[03:15 BOE]
-    T8[04:35 Monitor]
+    T8[Cada 30min]
+    T9[02:20 REE]
+    T10[04:45 PVGIS]
 
-    A --> T1 --> B[(db_sistema_electrico.omie_precios)]
-    B -->|FDW| C[(db_Ncore.core_precios_omie_diario)]
+    A --> T1 --> B[(db_sistema_electrico)]
+    B -->|FDW| C[(db_Ncore)]
     
-    CAT --> T2 --> ENR[(db_enriquecimiento.catastro_inmuebles)]
-    ENR --> T3 --> CATMAP[(core_catastro_map_uso_escore)]
+    CAT --> T2 --> ENR[(db_enriquecimiento)]
+    ENR --> T3 --> CATMAP[(core_catastro_map)]
+    
+    REE2 --> T9 --> REEMIX[(core_ree_mix_horario)]
+    PVGIS --> T10 --> PVGISRAD[(core_pvgis_radiacion)]
+
+    subgraph SistemaElectrico[db_sistema_electrico]
+        B
+        PVPC[(precios_horarios_pvpc)]
+        OMIE[(omie_precios)]
+        BOE1[(precio_regulado_boe)]
+    end
 
     subgraph Ncore[db_Ncore]
-        C --> T4
+        C
         D[(core_precios_omie)]
         E[(core_calendario_horario)]
         F[(core_precio_regulado_boe)]
         G[(core_peajes_acceso)]
         CATMAP
         MV[[mv_tarifas_vigentes]]
+        REEMIX
+        PVGISRAD
+        DAILY[(core_precios_omie_diario)]
     end
 
-    T5 -.-> D
-    T6 -.-> E
+    T5 --> PVPC
+    PVPC --> T8 --> D
+    T6 -.->|Maestro| D
+    T6 -.->|Maestro| F
+    T6 -.->|Maestro| DAILY
     T7 -.-> F
     F -->|recálculo| G --> MV
-    CATMAP --> T8
+    OMIE --> DAILY
+    BOE1 -->|FDW| F
 
+    style APIs fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style CAT fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style B fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style ENR fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style REE2 fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style PVGIS fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
+    style B fill:#E67E22,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style ENR fill:#E67E22,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style PVPC fill:#E67E22,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style OMIE fill:#E67E22,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style BOE1 fill:#E67E22,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
     style C fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style CATMAP fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style D fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style D fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style DAILY fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style REEMIX fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style PVGISRAD fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
     style E fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style F fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style G fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style MV fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style G fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style MV fill:#27AE60,stroke:#ffffff,stroke-width:2px,color:#ffffff
     
-    style T1 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T2 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T1 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T2 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style T3 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T4 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T5 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T6 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T7 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style T8 fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T4 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T5 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T6 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T7 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T8 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T9 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style T10 fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
+    style SistemaElectrico fill:#FFF5E6,stroke:#E67E22,stroke-width:2px
+    style Ncore fill:#E8F8F5,stroke:#1ABC9C,stroke-width:2px
 ```
 
-## ⏱️ Planificación Automática (launchd)
+## ⏱️ Planificación Automática
+
+### Jobs Críticos - Pipeline Ncore (Python/Cron)
+
+| Proceso | Hora | Script | Función |
+|---|---:|---|---|
+| **PVPC Update sistema_electrico** | <span style="color:#9B59B6">**05:30**</span> | `update_pvpc_simple.py` | Actualiza precios_horarios_pvpc desde OMIE |
+| **Sincronización Maestro** | <span style="color:#9B59B6">**06:00**</span> | `sync_all_to_ncore.py` | Sincronización completa sistema_electrico→Ncore |
+| **PVPC Incremental** | <span style="color:#9B59B6">**Cada 30min**</span> | `backfill_pvpc_to_ncore.py` | Mantiene core_precios_omie al día (últimos 2 días) |
+| **REE Mix/CO2** | <span style="color:#9B59B6">**Cada hora**</span> | `fetch_ree_mix_co2.py` | Mix generación y emisiones CO2 desde REE |
+| **BOE Regulado** | <span style="color:#9B59B6">**Domingos 03:00**</span> | `sync_boe_to_ncore.py` | Sincroniza precios regulados BOE |
+
+### Jobs Legacy (LaunchAgents/psql)
 
 | Proceso | Hora | LaunchAgent |
 |---|---:|---|
-| Ingesta OMIE day-ahead (origen) con 3 reintentos x5' y post-sync | 18:18 | `com.vagalume.omie.ingest_dayahead` |
-| Sincronización OMIE (Ncore, incluye mañana) | 18:31 | `com.vagalume.omie.sync_1640` |
-| Monitor OMIE day-ahead (24h + agregado) | 18:36 | `com.vagalume.omie.monitor_1645` |
-| Verificación nocturna OMIE (agregado) | 02:10 | `com.vagalume.omie.sync_0210` |
-| PVPC horario (30d incremental) | 02:15 | `com.vagalume.pvpc.sync_0215` |
-| Calendario tarifario (14d incremental) | 03:00 | `com.vagalume.calendario.sync_0300` |
-| BOE upsert + recálculo P1..P6 | 03:15 | `com.vagalume.boe.sync_0315` |
-| Catastro cache OVC (50 CUPS/día con coord) | 04:15 | `com.vagalume.catastro.fetch_ovc` |
-| Catastro diccionarios Ncore (64 usos oficiales) | 04:20 | `com.vagalume.catastro.build_dictionaries` |
-| Catastro mapeo uso→categoría eSCORE | 04:25 | `com.vagalume.catastro.build_mapping` |
-| Catastro promoción N2 (superficie kWh/m²) | 04:30 | `com.vagalume.catastro.fetch_n2` |
-| <span style="color:#1ABC9C">**REE mix/CO2**</span> | <span style="color:#1ABC9C">**02:20**</span> | `com.vagalume.ree.mixco2.ingest` |
-| <span style="color:#1ABC9C">**PVGIS irradiancia**</span> | <span style="color:#1ABC9C">**04:45**</span> | `com.vagalume.pvgis.ingest` |
-| <span style="color:#1ABC9C">**Zonas climáticas HDD/CDD**</span> | <span style="color:#1ABC9C">**01:05**</span> | `com.vagalume.zonas_climaticas.load_overnight` |
+| Ingesta OMIE day-ahead (origen) con 3 reintentos x5' y post-sync | <span style="color:#9B59B6">18:18</span> | `com.vagalume.omie.ingest_dayahead` |
+| Sincronización OMIE (Ncore, incluye mañana) | <span style="color:#9B59B6">18:31</span> | `com.vagalume.omie.sync_1640` |
+| Monitor OMIE day-ahead (24h + agregado) | <span style="color:#9B59B6">18:36</span> | `com.vagalume.omie.monitor_1645` |
+| Verificación nocturna OMIE (agregado) | <span style="color:#9B59B6">02:10</span> | `com.vagalume.omie.sync_0210` |
+| PVPC horario (30d incremental) | <span style="color:#9B59B6">02:15</span> | `com.vagalume.pvpc.sync_0215` |
+| Calendario tarifario (14d incremental) | <span style="color:#9B59B6">03:00</span> | `com.vagalume.calendario.sync_0300` |
+| BOE upsert + recálculo P1..P6 | <span style="color:#9B59B6">03:15</span> | `com.vagalume.boe.sync_0315` |
+| Catastro cache OVC (50 CUPS/día con coord) | <span style="color:#9B59B6">04:15</span> | `com.vagalume.catastro.fetch_ovc` |
+| Catastro diccionarios Ncore (64 usos oficiales) | <span style="color:#9B59B6">04:20</span> | `com.vagalume.catastro.build_dictionaries` |
+| Catastro mapeo uso→categoría eSCORE | <span style="color:#9B59B6">04:25</span> | `com.vagalume.catastro.build_mapping` |
+| Catastro promoción N2 (superficie kWh/m²) | <span style="color:#9B59B6">04:30</span> | `com.vagalume.catastro.fetch_n2` |
+| REE mix/CO2 | <span style="color:#9B59B6">02:20</span> | `com.vagalume.ree.mixco2.ingest` |
+| PVGIS irradiancia | <span style="color:#9B59B6">04:45</span> | `com.vagalume.pvgis.ingest` |
+| Zonas climáticas HDD/CDD | <span style="color:#9B59B6">01:05</span> | `com.vagalume.zonas_climaticas.load_overnight` |
 
 Notas:
 - OMIE publica los precios del día siguiente alrededor de las 16:30–17:00. Para evitar saturación, se programa la ingesta a las 18:18 con 3 intentos automáticos (cada 5 minutos) y sincronización inmediata a Ncore tras el primer intento exitoso.
 - La sincronización de respaldo se ejecuta a las 18:31 y el monitor valida a las 18:36 (23–25 horas en origen y agregado en Ncore).
 - La verificación nocturna a las 02:10 re-sincroniza por si hubiera revisiones.
 
-## 🧩 Automatización instalada (LaunchAgents)
+## 🧩 Automatización instalada
+
+### Jobs Pipeline Ncore (Cron/Python) - NUEVOS ✨
+
+Instalación rápida de todos los jobs:
+```bash
+bash /Users/vagalumeenergiamovil/PROYECTOS/Entorno/motores/db_watioverse/pipeline/Ncore/jobs/install_cron.sh
+```
+
+Scripts principales en `pipeline/Ncore/jobs/`:
+- **`update_pvpc_simple.py`** - Actualiza precios_horarios_pvpc en sistema_electrico desde OMIE
+- **`sync_all_to_ncore.py`** - Script maestro de sincronización completa (ejecuta todos los demás)
+- **`backfill_pvpc_to_ncore.py`** - Backfill parametrizable por rango de fechas
+- **`sync_boe_to_ncore.py`** - Sincroniza BOE regulado
+- **`fetch_ree_mix_co2.py`** - Descarga mix generación y CO2 desde REE
+- **`fetch_pvgis_radiation.py`** - Descarga radiación solar desde PVGIS
+
+### LaunchAgents Legacy (macOS)
 
 - Ingesta OMIE day-ahead (origen `db_sistema_electrico`) con 3 reintentos x5' y post-sync a Ncore:
   - `~/Library/LaunchAgents/com.vagalume.omie.ingest_dayahead.plist`
@@ -143,7 +210,9 @@ Notas:
   - `~/Library/LaunchAgents/com.vagalume.zonas_climaticas.load_overnight.plist` (01:05) - 11,830 CP con HDD/CDD→Ncore
 
 Observación:
-- Los LaunchAgents ejecutan one‑liners `psql`/`curl`/`jq` y no dependen de ficheros `.sh` o `.sql` del repositorio. Los nombres de BD y tablas son reales (sin alias) tal y como exige la operativa.
+- Los nuevos jobs Python son idempotentes y manejan reintentos automáticos
+- Los LaunchAgents legacy ejecutan one‑liners `psql`/`curl`/`jq`
+- Todos usan nombres de BD y tablas reales (sin alias) tal y como exige la operativa
 
 ## ❓ ¿Por qué precargar en Ncore y no llamar a las APIs en tiempo real?
 
