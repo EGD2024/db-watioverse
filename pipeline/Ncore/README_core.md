@@ -29,7 +29,7 @@ La base de datos NCORE (db_Ncore) centraliza todos los datos maestros no-PII que
 
 | Característica | Valor | Descripción |
 |----------------|-------|-------------|
-| **Total de Tablas** | 13 | Datos maestros sin PII |
+| **Total de Tablas** | 16 | Datos maestros sin PII |
 | **Cache Centralizado** | ✅ | Consultas optimizadas |
 | **Actualización** | Automática | Triggers y funciones |
 | **Vistas Materializadas** | 1 | Tarifas vigentes |
@@ -97,6 +97,9 @@ graph TD
 | **core_calendario** | 11 | Calendario con periodos | Anual |
 | **core_festivos** | 5 | Festivos por ámbito | Anual |
 | **core_precios_omie** | 11 | Histórico precios mercado | Diario |
+| **core_ree_mix_horario** | Variable | Mix generación por tecnología | Horario |
+| **core_ree_emisiones_horario** | Variable | Emisiones CO2 por hora | Horario |
+| **core_pvgis_radiacion** | Variable | Radiación solar mensual | Mensual |
 | **core_factores_emision** | 9 | Factores CO2 | Anual |
 | **core_coeficientes_conversion** | 9 | Conversión unidades | Estático |
 | **core_catastro_dic_uso** | 5 | 64 usos oficiales Catastro | Automático |
