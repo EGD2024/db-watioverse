@@ -2,7 +2,7 @@
 -- CREACIÓN DE BASE DE DATOS CORE - DATOS MAESTROS
 -- Datos de referencia no-PII centralizados
 -- Fecha: 2025-09-08
--- Base de datos: db_core
+-- Base de datos: db_Ncore
 -- =====================================================
 
 -- =====================================================

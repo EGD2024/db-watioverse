@@ -1,11 +1,11 @@
-# 🎯 Base de Datos CORE - Datos Maestros Centralizados
+# 🎯 Base de Datos NCORE - Datos Maestros Centralizados
 
 ![Versión](https://img.shields.io/badge/versión-1.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-nueva-yellow)
 ![Tablas](https://img.shields.io/badge/tablas-10-purple)
 ![Tipo](https://img.shields.io/badge/tipo-maestros_no_PII-green)
 
-**Módulo:** db_core - Datos de Referencia Centralizados  
+**Módulo:** db_Ncore - Datos de Referencia Centralizados  
 **Proyecto interno de Energy Green Data**
 
 ---
@@ -23,7 +23,7 @@
 
 ## 🎯 Descripción General
 
-La base de datos CORE centraliza todos los datos maestros no-PII que son compartidos por el pipeline N0→N4. Optimiza el rendimiento eliminando JOINs entre bases de datos y proporciona una fuente única de verdad para datos de referencia.
+La base de datos NCORE (db_Ncore) centraliza todos los datos maestros no-PII que son compartidos por el pipeline N0→N4. Optimiza el rendimiento eliminando JOINs entre bases de datos y proporciona una fuente única de verdad para datos de referencia.
 
 ### Características Principales
 
@@ -189,11 +189,11 @@ WHERE query_hash = MD5('SELECT * FROM core_comercializadoras WHERE activa = true
 
 ```bash
 # Base de datos
-DB_CORE_HOST=localhost
-DB_CORE_PORT=5432
-DB_CORE_NAME=db_core
-DB_CORE_USER=postgres
-DB_CORE_PASSWORD=admin
+DB_NCORE_HOST=localhost
+DB_NCORE_PORT=5432
+DB_NCORE_NAME=db_Ncore
+DB_NCORE_USER=postgres
+DB_NCORE_PASSWORD=admin
 
 # Actualización automática
 UPDATE_OMIE_DAILY=true
@@ -221,10 +221,10 @@ CACHE_TTL_HOURS=1
 
 ```bash
 # Crear BD
-createdb -U postgres db_core
+createdb -U postgres db_Ncore
 
 # Ejecutar script
-psql -U postgres -d db_core -f crear_db_core.sql
+psql -U postgres -d db_Ncore -f crear_db_core.sql
 ```
 
 ### Paso 2: Cargar Datos Iniciales
@@ -247,7 +247,7 @@ python3 generate_calendario.py
 0 1 * * * /usr/bin/python3 /path/to/update_omie_prices.py
 
 # Cron para cache cleanup
-0 */6 * * * psql -d db_core -c "DELETE FROM core_cache_consultas WHERE fecha_cache < NOW() - INTERVAL '24 hours'"
+0 */6 * * * psql -d db_Ncore -c "DELETE FROM core_cache_consultas WHERE fecha_cache < NOW() - INTERVAL '24 hours'"
 ```
 
 ---
