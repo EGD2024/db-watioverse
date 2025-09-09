@@ -24,7 +24,7 @@
 
 ## 🎯 Estado General
 
-El sistema integra **8 APIs externas** para enriquecimiento de datos energéticos. **4 APIs están funcionales** y **4 están bloqueadas** o pendientes de implementación. Estado validado por auditoría MCP exhaustiva.
+El sistema integra **8 APIs externas** para enriquecimiento de datos energéticos. **4 APIs están funcionales**, **2 esperan nuevos tokens** y **2 están bloqueadas**. Estado validado por auditoría MCP exhaustiva.
 
 ### Resumen Ejecutivo
 
@@ -32,27 +32,15 @@ El sistema integra **8 APIs externas** para enriquecimiento de datos energético
 |---------|-------|--------|
 | **APIs Totales** | 8 | 📊 INVENTARIADAS |
 | **APIs Funcionales** | 4 | ✅ 50% OPERATIVO |
-| **APIs Bloqueadas** | 4 | ❌ REQUIERE ACCIÓN |
-| **Datos Poblados** | 4,087/11,830 zonas | 🔄 35% COMPLETO |
+| **APIs Pendientes Token** | 2 | 🔄 ESPERANDO TOKENS |
+| **APIs Bloqueadas** | 2 | ❌ REQUIERE ACCIÓN |
+| **Zonas Climáticas** | 4,087/11,830 | 🔄 35% COMPLETO |
 
 ---
 
 ## ✅ APIs Funcionales
 
-### 1. REE Mercados (PVPC)
-- **Estado**: ✅ FUNCIONAL
-- **Endpoint**: `mercados/precios-mercados-tiempo-real`
-- **Datos**: Precios PVPC horarios
-- **Implementación**: `core_precios_omie`
-- **Rate Limit**: Sin restricciones detectadas
-- **Última validación**: 9 Sept 2025
-
-```python
-# Ejemplo de uso
-REE_MERCADOS_ENDPOINT = "https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real"
-```
-
-### 2. Open-Meteo
+### 1. Open-Meteo
 - **Estado**: ✅ FUNCIONAL
 - **Datos**: HDD, CDD, temperatura media, radiación
 - **Implementación**: `core_zonas_climaticas`
@@ -64,18 +52,52 @@ REE_MERCADOS_ENDPOINT = "https://apidatos.ree.es/es/datos/mercados/precios-merca
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 ```
 
-### 3. Nominatim (OpenStreetMap)
+### 2. Nominatim (OpenStreetMap)
 - **Estado**: ✅ FUNCIONAL
 - **Datos**: Geocodificación de códigos postales
 - **Uso**: Conversión CP → coordenadas GPS
 - **Rate Limit**: 1 req/seg (respetado)
 - **Timeouts**: Ocasionales pero manejados
 
+### 3. Catastro OVC
+- **Estado**: ✅ FUNCIONAL
+- **Endpoints**: `Consulta_RCCOOR_Distancia`, `Consulta_DNPRC`
+- **Datos**: 1 inmueble validado en sistema
+- **Implementación**: `n2_catastro_inmueble`
+- **Uso**: Superficie construida para métricas kWh/m²
+
 ### 4. PVGIS (Photovoltaic GIS)
 - **Estado**: ✅ FUNCIONAL
 - **Datos**: Radiación solar para fotovoltaica
 - **Implementación**: `core_pvgis_radiacion`
 - **Cobertura**: Europa completa
+
+### 5. Euskadi Certificados Energéticos
+- **Estado**: 🔄 EVALUANDO
+- **URL**: `https://opendata.euskadi.eus/api-energy-efficiency/?api=energy-efficiency`
+- **Datos**: Certificados eficiencia energética oficiales
+- **Cobertura**: País Vasco (regional)
+- **Uso**: Benchmarking y validación certificados
+- **Ventaja**: API abierta, sin token requerido
+
+---
+
+## 🔄 APIs Pendientes de Token
+
+### 1. ESIOS (REE Oficial)
+- **Estado**: 🔄 ESPERANDO NUEVO TOKEN
+- **Token actual**: `511a5399534031be32848c7fbc85cafc0e618db32c6cbebe5b3d6dd103017ff9` (expirado)
+- **Datos**: Datos oficiales sistema eléctrico español
+- **Uso**: Mix energético, emisiones CO2, precios
+- **Prioridad**: ALTA - API principal para datos energéticos
+- **Acción**: Solicitar renovación token
+
+### 2. EPREL (European Product Database)
+- **Estado**: 🔄 ESPERANDO TOKEN
+- **Datos**: Eficiencia energética electrodomésticos
+- **Uso**: Scoring eficiencia equipos
+- **Prioridad**: MEDIA - Para análisis detallado consumos
+- **Acción**: Registrarse y obtener token
 
 ---
 
@@ -88,11 +110,6 @@ OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 - **Datos**: Mix energético nacional por horas
 - **Impacto**: ALTO - Crítico para scoring sostenibilidad
 
-```bash
-# Error típico
-HTTP 403 Forbidden - Incapsula incident ID: xxx
-```
-
 ### 2. REE Emisiones CO2
 - **Estado**: ❌ BLOQUEADA
 - **Endpoint**: `generacion/emisiones-co2`
@@ -100,18 +117,6 @@ HTTP 403 Forbidden - Incapsula incident ID: xxx
 - **Datos**: Emisiones CO2 por kWh
 - **Impacto**: ALTO - Esencial para huella carbono
 
-### 3. ESIOS (REE Oficial)
-- **Estado**: ❌ BLOQUEADA
-- **Token**: `511a5399534031be32848c7fbc85cafc0e618db32c6cbebe5b3d6dd103017ff9`
-- **Error**: HTTP 403 Forbidden
-- **Causa**: Token inválido/expirado o restricciones uso
-- **Datos**: Datos oficiales sistema eléctrico español
-
-### 4. Catastro OVC
-- **Estado**: ⚠️ IMPLEMENTADO NO VALIDADO
-- **Endpoints**: `Consulta_RCCOOR_Distancia`, `Consulta_DNPRC`
-- **Datos**: Superficie construida, uso inmuebles
-- **Impacto**: MEDIO - Para métricas kWh/m²
 
 ---
 
@@ -119,12 +124,12 @@ HTTP 403 Forbidden - Incapsula incident ID: xxx
 
 ### Alternativas Implementadas
 
-| API Bloqueada | Alternativa | Estado | Prioridad |
-|---------------|-------------|--------|-----------|
+| API Pendiente/Bloqueada | Alternativa | Estado | Prioridad |
+|-------------------------|-------------|--------|-----------|
+| **ESIOS** | Renovar token oficial | 🔄 EN PROCESO | 🔴 ALTA |
+| **EPREL** | Obtener token nuevo | 🔄 PENDIENTE | 🟡 MEDIA |
 | **REE Mix** | ENTSO-E Transparency | 🔄 PENDIENTE | 🔴 ALTA |
 | **REE CO2** | ENTSO-E Transparency | 🔄 PENDIENTE | 🔴 ALTA |
-| **ESIOS** | REE CSV manual | 🔄 PENDIENTE | 🟡 MEDIA |
-| **REE Generación** | Mock data temporal | ✅ IMPLEMENTADO | 🟢 BAJA |
 
 ### ENTSO-E Transparency Platform
 - **URL**: `https://transparency.entsoe.eu/api`
@@ -196,12 +201,13 @@ def api_request_with_delay(url, headers=None):
 
 ### Estadísticas Actuales
 
-| API | Requests/día | Success Rate | Avg Response |
-|-----|--------------|--------------|--------------|
-| **REE Mercados** | ~24 | 95% | 1.2s |
-| **Open-Meteo** | ~100 | 90% | 0.8s |
-| **Nominatim** | ~50 | 85% | 2.1s |
-| **PVGIS** | ~10 | 98% | 1.5s |
+| API | Requests/día | Success Rate | Últimos Datos |
+|-----|--------------|--------------|---------------|
+| **OMIE** | ~24 | 95% | 8 Sept 21:00 |
+| **Open-Meteo** | ~100 | 90% | 4,087 zonas |
+| **Nominatim** | ~50 | 85% | Geocodificación |
+| **Catastro** | ~5 | 100% | 1 inmueble |
+| **PVGIS** | ~10 | 98% | Radiación solar |
 
 ### Errores Comunes
 

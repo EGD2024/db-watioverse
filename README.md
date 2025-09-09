@@ -10,7 +10,7 @@
 ![Pipeline](https://img.shields.io/badge/pipeline-N0→N1→N2→N3-purple)
 ![Bases](https://img.shields.io/badge/bases_de_datos-28-orange)
 ![MCP](https://img.shields.io/badge/MCP-28_conectadas-green)
-![APIs](https://img.shields.io/badge/APIs-4/8_funcionales-yellow)
+![APIs](https://img.shields.io/badge/APIs-4_funcionales_2_tokens-yellow)
 
 **Repositorio de capas de datos para el procesamiento y análisis de información energética con integración híbrida al Motor eSCORE**
 
@@ -59,7 +59,7 @@ El ecosistema `db_watioverse` se integra con el Motor eSCORE mediante una arquit
 | **Bases de Datos** | 28/28 | ✅ 100% | Conectadas vía MCP |
 | **Tablas Activas** | 183+ | ✅ OPERATIVO | Inventario completo validado |
 | **Pipeline N0→N3** | Funcional | ✅ COMPLETO | Scoring end-to-end |
-| **APIs Funcionales** | 4/8 | ⚠️ 50% | REE, Open-Meteo, Nominatim, PVGIS |
+| **APIs Funcionales** | 4/8 | ✅ 50% | Open-Meteo, Nominatim, Catastro, PVGIS |
 | **Zonas Climáticas** | 4,087/11,830 | 🔄 35% | En progreso de carga |
 | **Performance** | <2ms | ✅ SLA | Consultas críticas optimizadas |
 
