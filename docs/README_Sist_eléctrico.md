@@ -15,7 +15,10 @@ Fecha de generación: 2025-09-09
 - Descripción General
 - Arquitectura del Sistema
 - Base de Datos — Esquema actual (MCP)
+- Indicadores ESIOS confirmados y mapeo
 - Elementos críticos para simulación PVPC/Indexado
+- Nuevas tablas propuestas (ESIOS)
+- Redes sociales — modelo propuesto
 - Propuesta final (sin cambios estructurales)
 - Próximos pasos
 
@@ -148,6 +151,25 @@ A continuación se listan las tablas y vistas relevantes del esquema `public` en
 
 ---
 
+## Indicadores ESIOS confirmados y mapeo
+
+A fecha de este documento, en el código del repositorio se usan los siguientes indicadores ESIOS (confirmados en jobs y módulos):
+
+- 1001 — PVPC 2.0TD (término de energía activa)
+- 1293 — Demanda eléctrica en tiempo real
+- 1433 — Generación renovable
+- 1434 — Generación no renovable
+- 1739 — Emisiones de CO2 del sistema (gCO2/kWh)
+
+Correspondencia actual con tablas:
+
+- 1001 → Se usa para alimentar precios horarios PVPC (ver `precios_horarios_pvpc`). Para almacenamiento crudo ESIOS se propone tabla específica; ver sección «Nuevas tablas propuestas».
+- 1293 → Puede alimentar resúmenes de demanda; ver «Redes sociales — modelo propuesto».
+- 1433/1434 → Se utilizan para completar `core_ree_mix_horario` (Ncore) con datos ESIOS.
+- 1739 → Se utiliza para completar `core_ree_emisiones_horario` (Ncore) con datos ESIOS.
+
+---
+
 ## ★ Elementos críticos para simulación PVPC / Indexado
 
 - ★ `omie_precios.precio_energia` — Precio horario base (indexado)
@@ -159,6 +181,188 @@ A continuación se listan las tablas y vistas relevantes del esquema `public` en
 Notas:
 - Para simulación de factura final pueden ser necesarios `historico_iva` e `historico_impuesto_electrico` (impuestos). No son imprescindibles para el precio energético sin impuestos.
 - El margen comercial, pérdidas o ajustes específicos de indexado no están almacenados como tabla en `db_sistema_electrico`; deben parametrizarse externamente si se usan.
+
+---
+
+## Nuevas tablas propuestas (ESIOS)
+
+Objetivo: almacenar indicadores ESIOS de forma genérica, trazable y eficiente, sin duplicar estructura por indicador. Las tablas propuestas residen en `db_Ncore` (manteniendo compatibilidad con el ecosistema actual) y evitan asumir IDs no confirmados.
+
+- `db_Ncore.core_esios_indicador`
+  - `indicator_id` integer PK — ID oficial ESIOS (p. ej., 1001, 1293, 1433, 1434, 1739)
+  - `nombre` text — etiqueta oficial ESIOS
+  - `unidad` text — unidad oficial (p. ej., EUR/MWh, gCO2/kWh)
+  - `geo_id` integer — ámbito geográfico (p. ej., 8741 península)
+  - `descripcion` text — descripción breve
+  - `activo` boolean default true — indicador activo para ingesta
+  - `ultima_actualizacion` timestamptz — marca de tiempo de última ingesta
+
+- `db_Ncore.core_esios_valor_horario`
+  - `indicator_id` integer FK → `core_esios_indicador.indicator_id`
+  - `fecha_hora` timestamptz — instante del dato (UTC)
+  - `geo_id` integer — ámbito geográfico
+  - `valor` numeric — valor numérico principal
+  - `raw` jsonb — payload completo de ESIOS para auditoría
+  - `fuente` text default 'ESIOS'
+  - PK compuesta: (`indicator_id`, `fecha_hora`, `geo_id`)
+
+- Vistas de conveniencia (sin duplicar almacenamiento):
+  - `db_Ncore.v_esios_pvpc_horario` = filtro de `core_esios_valor_horario` por `indicator_id = 1001` ★
+  - `db_Ncore.v_esios_emisiones_horarias` = filtro por `indicator_id = 1739`
+  - `db_Ncore.v_esios_demanda_horaria` = filtro por `indicator_id = 1293`
+  - `db_Ncore.v_esios_mix_ren_no_ren` = combinación de `indicator_id IN (1433,1434)`
+
+Relación con `db_sistema_electrico`:
+
+- `precios_horarios_pvpc` continúa siendo la tabla resultante con desglose por componentes (energía, peajes, cargos, total). La vista `v_esios_pvpc_horario` (★) puede servir como insumo del campo `precio_energia` cuando se simule PVPC a partir de ESIOS (verificado con el indicador 1001).
+
+### Mapa tabla ↔ indicador ESIOS (confirmados)
+
+- `core_esios_valor_horario` → 1001 (PVPC 2.0TD) ★, 1293 (Demanda), 1433 (Renovable), 1434 (No renovable), 1739 (CO2)
+- `v_esios_pvpc_horario` → 1001 ★
+- `v_esios_emisiones_horarias` → 1739
+- `v_esios_demanda_horaria` → 1293
+- `v_esios_mix_ren_no_ren` → 1433, 1434
+
+### Tablas derivadas para análisis operativo (agregados diarios)
+
+- `db_Ncore.core_esios_pvpc_diario`
+  - `dia` date PK
+  - `pvpc_medio_kwh` numeric ★
+  - `pvpc_min_kwh` numeric, `pvpc_max_kwh` numeric
+  - `created_at` timestamptz
+  - Fuente: 1001
+
+- `db_Ncore.core_esios_mix_diario`
+  - `dia` date PK
+  - `renovable_mwh` numeric, `no_renovable_mwh` numeric
+  - `renovable_pct_medio` numeric
+  - `created_at` timestamptz
+  - Fuente: 1433, 1434
+
+- `db_Ncore.core_esios_emisiones_diario`
+  - `dia` date PK
+  - `gco2_medio` numeric
+  - `created_at` timestamptz
+  - Fuente: 1739
+
+- `db_Ncore.core_esios_demanda_diario`
+  - `dia` date PK
+  - `demanda_max_mw` numeric, `demanda_media_mw` numeric
+  - `created_at` timestamptz
+  - Fuente: 1293
+
+Estas tablas son agregados de conveniencia; los datos fuente permanecen en `core_esios_valor_horario`.
+
+### DDL propuesto (SQL)
+
+```sql
+-- Catálogo de indicadores ESIOS (confirmados: 1001,1293,1433,1434,1739)
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_indicador (
+  indicator_id integer PRIMARY KEY,
+  nombre text NOT NULL,
+  unidad text,
+  geo_id integer DEFAULT 8741,
+  descripcion text,
+  activo boolean DEFAULT true,
+  ultima_actualizacion timestamptz
+);
+
+-- Valores horarios ESIOS (genérico)
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_valor_horario (
+  indicator_id integer NOT NULL REFERENCES db_Ncore.core_esios_indicador(indicator_id),
+  fecha_hora timestamptz NOT NULL,
+  geo_id integer NOT NULL DEFAULT 8741,
+  valor numeric,
+  raw jsonb,
+  fuente text DEFAULT 'ESIOS',
+  PRIMARY KEY (indicator_id, fecha_hora, geo_id)
+);
+CREATE INDEX IF NOT EXISTS idx_esios_valor_hora ON db_Ncore.core_esios_valor_horario (fecha_hora);
+
+-- Agregados diarios
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_pvpc_diario (
+  dia date PRIMARY KEY,
+  pvpc_medio_kwh numeric,
+  pvpc_min_kwh numeric,
+  pvpc_max_kwh numeric,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_mix_diario (
+  dia date PRIMARY KEY,
+  renovable_mwh numeric,
+  no_renovable_mwh numeric,
+  renovable_pct_medio numeric,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_emisiones_diario (
+  dia date PRIMARY KEY,
+  gco2_medio numeric,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_demanda_diario (
+  dia date PRIMARY KEY,
+  demanda_max_mw numeric,
+  demanda_media_mw numeric,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Modelo para publicaciones sociales
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_resumen_diario (
+  dia date PRIMARY KEY,
+  pvpc_medio_kwh numeric,
+  pvpc_min_kwh numeric,
+  pvpc_max_kwh numeric,
+  gco2_medio numeric,
+  renovable_pct_medio numeric,
+  demanda_max_mw numeric,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_evento_social (
+  id_evento bigserial PRIMARY KEY,
+  dia date NOT NULL,
+  tipo text NOT NULL,
+  indicator_id integer,
+  valor numeric,
+  unidad text,
+  descripcion text,
+  detalles jsonb,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_evento_social_dia ON db_Ncore.core_esios_evento_social (dia);
+```
+
+---
+
+## Redes sociales — modelo propuesto
+
+Objetivo: disponer de un «feed» interno con métricas y récords diarios basados en ESIOS para publicaciones divulgativas.
+
+- `db_Ncore.core_esios_resumen_diario`
+  - `dia` date PK
+  - `pvpc_medio_kwh` numeric — media diaria del indicador 1001 (★ insumo para análisis PVPC, no imprescindible para simulación)
+  - `pvpc_min_kwh` numeric, `pvpc_max_kwh` numeric
+  - `gco2_medio` numeric — media diaria del 1739
+  - `renovable_pct_medio` numeric — derivado de 1433/1434
+  - `demanda_max_mw` numeric — máximo diario de 1293
+  - `created_at` timestamptz
+
+- `db_Ncore.core_esios_evento_social`
+  - `id_evento` bigserial PK
+  - `dia` date — fecha del evento
+  - `tipo` text — categoría (record_renovable, precio_extremo, demanda_punta, etc.)
+  - `indicator_id` integer — referencia al indicador que lo origina (cuando aplique)
+  - `valor` numeric, `unidad` text
+  - `descripcion` text — resumen editorial para publicación
+  - `detalles` jsonb — contexto adicional (picos por hora, comparativas)
+
+Notas:
+- Estas tablas son propuestas. La derivación de métricas se hará a partir de `core_esios_valor_horario` y/o de las tablas ya pobladas (`core_ree_mix_horario`, `core_ree_emisiones_horario`).
+- IDs distintos a (1001, 1293, 1433, 1434, 1739) se incorporarán una vez validados documentalmente.
 
 ---
 
