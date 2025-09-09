@@ -12,18 +12,18 @@ Fecha de generación: 2025-09-09
 
 ## 📑 Tabla de Contenidos
 
-- Descripción General
-- Arquitectura del Sistema
-- Base de Datos — Esquema actual (MCP)
-- Mapa de bases de datos (responsabilidades y ubicación)
-- Indicadores ESIOS confirmados y mapeo
-- Cobertura completa de indicadores (SCORE y Redes Sociales)
-- Elementos críticos para simulación PVPC/Indexado
-- Nuevas tablas propuestas (ESIOS)
-- Normalización temporal y versionado (obligatorio)
-- Redes sociales — modelo propuesto
-- Propuesta final (sin cambios estructurales)
-- Próximos pasos
+ - [Descripción General](#-descripción-general)
+ - [Arquitectura del Sistema](#-arquitectura-del-sistema)
+ - [Base de Datos — Esquema actual (consultado por MCP)](#-base-de-datos--esquema-actual-consultado-por-mcp)
+ - [Mapa de bases de datos (responsabilidades y ubicación)](#-mapa-de-bases-de-datos-responsabilidades-y-ubicación)
+ - [Indicadores ESIOS confirmados y mapeo](#-indicadores-esios-confirmados-y-mapeo)
+ - [Cobertura completa de indicadores (SCORE y Redes Sociales)](#-cobertura-completa-de-indicadores-score-y-redes-sociales)
+ - [Elementos críticos para simulación PVPC / Indexado](#-elementos-críticos-para-simulación-pvpc--indexado)
+ - [Nuevas tablas propuestas (ESIOS)](#-nuevas-tablas-propuestas-esios)
+ - [Normalización temporal y versionado (obligatorio)](#-normalización-temporal-y-versionado-obligatorio)
+ - [Redes sociales — modelo propuesto](#-redes-sociales--modelo-propuesto)
+ - [Propuesta final (sin cambios estructurales)](#-propuesta-final-sin-cambios-estructurales)
+ - [Próximos pasos](#-próximos-pasos)
 
 ---
 
@@ -36,9 +36,9 @@ Este documento describe el modelo de datos del sistema eléctrico usado en el ec
 ```mermaid
 flowchart LR
     subgraph Fuentes[Fuentes Externas]
-        OMIE[OMIE - Precios day-ahead]
-        BOE[BOE - Peajes/Cargos]
-        ESIOS[ESIOS - Datos oficiales (mix/CO2/demanda)]
+        OMIE[OMIE Precios day ahead]
+        BOE[BOE Peajes y Cargos]
+        ESIOS[ESIOS Mix CO2 Demanda]
     end
 
     subgraph SE[db_sistema_electrico]
@@ -178,14 +178,14 @@ flowchart LR
     IND[core_esios_indicador]
     VAL[core_esios_valor_horario]
     ING[core_esios_ingesta_ejecucion]
-    VIEWS[v_esios_ind_{ID}]
+    VIEWS[v_esios_ind_ID]
   end
 
   subgraph SE[db_sistema_electrico]
     OM[omie_precios]
-    PV[precios_horarios_pvpc ★]
-    BO[precio_regulado_boe ★]
-    CAL[calendario_tarifario_YYYY ★]
+    PV[precios_horarios_pvpc]
+    BO[precio_regulado_boe]
+    CAL[calendario_tarifario_YYYY]
   end
 
   subgraph ES[db_eSCORE_*]
