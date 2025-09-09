@@ -28,9 +28,9 @@ Sistema automático para mantener actualizados los precios energéticos y refere
 ```mermaid
 flowchart LR
     subgraph APIs[APIs Externas]
-        A[[REE: Precios OMIE day-ahead]]
+        A[[ESIOS: Precios PVPC horarios]]
         CAT[[OVC Catastro]]
-        REE2[[REE: Mix/CO2]]
+        ESIOS2[[ESIOS: Mix/CO2]]
         PVGIS[[PVGIS: Radiación]]
     end
 
@@ -42,7 +42,7 @@ flowchart LR
     T6[06:00 Sync All]
     T7[03:15 BOE]
     T8[Cada 30min]
-    T9[02:20 REE]
+    T9[02:20 ESIOS]
     T10[04:45 PVGIS]
 
     A --> T1 --> B[(db_sistema_electrico)]
@@ -51,7 +51,7 @@ flowchart LR
     CAT --> T2 --> ENR[(db_enriquecimiento)]
     ENR --> T3 --> CATMAP[(core_catastro_map)]
     
-    REE2 --> T9 --> REEMIX[(core_ree_mix_horario)]
+    ESIOS2 --> T9 --> REEMIX[(core_ree_mix_horario)]
     PVGIS --> T10 --> PVGISRAD[(core_pvgis_radiacion)]
 
     subgraph SistemaElectrico[db_sistema_electrico]
@@ -87,7 +87,7 @@ flowchart LR
     style APIs fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style CAT fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
-    style REE2 fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style ESIOS2 fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     style PVGIS fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
     
     style B fill:#E67E22,stroke:#ffffff,stroke-width:2px,color:#ffffff
@@ -132,7 +132,7 @@ flowchart LR
 | **PVPC Update sistema_electrico** | <span style="color:#9B59B6">**05:30**</span> | `update_pvpc_simple.py` | Actualiza precios_horarios_pvpc desde OMIE |
 | **Sincronización Maestro** | <span style="color:#9B59B6">**06:00**</span> | `sync_all_to_ncore.py` | Sincronización completa sistema_electrico→Ncore |
 | **PVPC Incremental** | <span style="color:#9B59B6">**Cada 30min**</span> | `backfill_pvpc_to_ncore.py` | Mantiene core_precios_omie al día (últimos 2 días) |
-| **REE Mix/CO2** | <span style="color:#9B59B6">**Cada hora**</span> | `fetch_ree_mix_co2.py` | Mix generación y emisiones CO2 desde REE |
+| **ESIOS Mix/CO2** | <span style="color:#9B59B6">**Cada hora**</span> | `fetch_ree_mix_co2.py` | Mix generación y emisiones CO2 desde ESIOS API |
 | **BOE Regulado** | <span style="color:#9B59B6">**Domingos 03:00**</span> | `sync_boe_to_ncore.py` | Sincroniza precios regulados BOE |
 | **Códigos Postales** | <span style="color:#9B59B6">**Cada 6 meses**</span> | `ejecutar_poblado_cp.py` | Validación y actualización territorial |
 
@@ -151,7 +151,7 @@ flowchart LR
 | Catastro diccionarios Ncore (64 usos oficiales) | <span style="color:#9B59B6">04:20</span> | `com.vagalume.catastro.build_dictionaries` |
 | Catastro mapeo uso→categoría eSCORE | <span style="color:#9B59B6">04:25</span> | `com.vagalume.catastro.build_mapping` |
 | Catastro promoción N2 (superficie kWh/m²) | <span style="color:#9B59B6">04:30</span> | `com.vagalume.catastro.fetch_n2` |
-| REE mix/CO2 | <span style="color:#9B59B6">02:20</span> | `com.vagalume.ree.mixco2.ingest` |
+| ESIOS mix/CO2 | <span style="color:#9B59B6">02:20</span> | `com.vagalume.esios.mixco2.ingest` |
 | PVGIS irradiancia | <span style="color:#9B59B6">04:45</span> | `com.vagalume.pvgis.ingest` |
 | Zonas climáticas HDD/CDD | <span style="color:#9B59B6">01:05</span> | `com.vagalume.zonas_climaticas.load_overnight` |
 
@@ -174,7 +174,7 @@ Scripts principales en `pipeline/Ncore/jobs/`:
 - **`sync_all_to_ncore.py`** - Script maestro de sincronización completa (ejecuta todos los demás)
 - **`backfill_pvpc_to_ncore.py`** - Backfill parametrizable por rango de fechas
 - **`sync_boe_to_ncore.py`** - Sincroniza BOE regulado
-- **`fetch_ree_mix_co2.py`** - Descarga mix generación y CO2 desde REE
+- **`fetch_ree_mix_co2.py`** - Descarga mix generación y CO2 desde ESIOS API
 - **`fetch_pvgis_radiation.py`** - Descarga radiación solar desde PVGIS
 
 ### LaunchAgents Legacy (macOS)
@@ -201,8 +201,8 @@ Scripts principales en `pipeline/Ncore/jobs/`:
   - `~/Library/LaunchAgents/com.vagalume.catastro.build_mapping.plist` (04:25) - Mapeo uso→categoría eSCORE
   - `~/Library/LaunchAgents/com.vagalume.catastro.fetch_n2.plist` (04:30) - Promoción superficie→N2
 
-- REE mix/CO2 (Ncore):
-  - `~/Library/LaunchAgents/com.vagalume.ree.mixco2.ingest.plist` (02:20) - Mix generación y emisiones→Ncore
+- ESIOS mix/CO2 (Ncore):
+  - `~/Library/LaunchAgents/com.vagalume.esios.mixco2.ingest.plist` (02:20) - Mix generación y emisiones→Ncore (migrado desde REE)
 
 - PVGIS irradiancia (Ncore):
   - `~/Library/LaunchAgents/com.vagalume.pvgis.ingest.plist` (04:45) - Radiación mensual kWh/m²→Ncore
@@ -227,7 +227,7 @@ Observación:
 ## ❓ ¿Por qué precargar en Ncore y no llamar a las APIs en tiempo real?
 
 - Respuesta inmediata y estable: eSCORE (N3) lee N1+N2 locales, sin depender de latencias, timeouts o cuotas de terceros.
-- Resiliencia: si REE/OMIE/OVC caen o limitan, el sistema sigue operativo con los datos ya precargados.
+- Resiliencia: si ESIOS/OMIE/OVC caen o limitan, el sistema sigue operativo con los datos ya precargados.
 - Idempotencia y reproducibilidad: guardamos RAW+normalizado; mismo input ⇒ mismo resultado, con auditoría y re‑cálculo garantizado.
 - Normalización multisource: unificamos unidades y reglas (p. ej., derivación CTE por altitud) antes de exponer a N3.
 - Auditoría y trazabilidad: tablas `core_*` con timestamps explicables sin “viajar” a la API.
@@ -267,7 +267,7 @@ FROM core_precio_regulado_boe
 WHERE fecha_hora >= CURRENT_DATE - INTERVAL '30 days';
 ```
 
-- Verificación REE mix (tecnologías generación):
+- Verificación ESIOS mix (tecnologías generación):
 
 ```sql
 -- Mix horario por tecnología (ayer)
@@ -280,7 +280,7 @@ GROUP BY 1, 2
 ORDER BY pct_medio DESC LIMIT 10;
 ```
 
-- Verificación REE emisiones CO2:
+- Verificación ESIOS emisiones CO2:
 
 ```sql
 -- Debe devolver 23-25 horas (maneja DST)
@@ -348,9 +348,9 @@ WHERE LEFT(lcp.codigo_postal, 2)::integer != l.id_provincia;
   - Origen: `db_sistema_electrico.omie_precios` (EUR/kWh)
   - Ncore: `db_Ncore.core_precios_omie_diario` (EUR/MWh), `db_Ncore.core_precios_omie`, `db_Ncore.core_calendario_horario`, `db_Ncore.core_precio_regulado_boe`, `db_Ncore.core_peajes_acceso`, `db_Ncore.mv_tarifas_vigentes`.
 - Unidades:
-  - La API REE devuelve EUR/MWh. El origen se almacena en EUR/kWh (÷1000). Ncore agrega en EUR/MWh.
+  - La API ESIOS devuelve EUR/MWh. El origen se almacena en EUR/kWh (÷1000). Ncore agrega en EUR/MWh.
 - Robustez:
-  - Ingesta usa paquetes semanales con fallback diario y reintentos (backoff) + endpoint alternativo de REE.
+  - Ingesta usa indicadores ESIOS con fallback y reintentos (backoff) + autenticación por token.
 - Seguridad de cron:
   - Todos los scripts `.sh` exportan PATH para ejecución correcta desde cron.
 

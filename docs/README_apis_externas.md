@@ -5,8 +5,8 @@
 # 🌐 APIs Externas - Estado y Configuración
 
 ![Versión](https://img.shields.io/badge/versión-3.0.0-blue)
-![Estado](https://img.shields.io/badge/estado-parcial-yellow)
-![APIs Funcionales](https://img.shields.io/badge/APIs_funcionales-4/8-orange)
+![Estado](https://img.shields.io/badge/estado-operativo-green)
+![APIs Funcionales](https://img.shields.io/badge/APIs_funcionales-6/8-green)
 ![MCP Validado](https://img.shields.io/badge/MCP-validado-green)
 
 **Módulo:** Integración APIs Externas  
@@ -24,16 +24,16 @@
 
 ## 🎯 Estado General
 
-El sistema integra **8 APIs externas** para enriquecimiento de datos energéticos. **4 APIs están funcionales**, **2 esperan nuevos tokens** y **2 están bloqueadas**. Estado validado por auditoría MCP exhaustiva.
+El sistema integra **8 APIs externas** para enriquecimiento de datos energéticos. **6 APIs están funcionales** tras la migración exitosa de REE a ESIOS, **1 API espera token** y **1 API fue migrada completamente**. Estado actualizado tras migración REE→ESIOS del 9 de Septiembre de 2025.
 
 ### Resumen Ejecutivo
 
 | Métrica | Valor | Estado |
 |---------|-------|--------|
 | **APIs Totales** | 8 | 📊 INVENTARIADAS |
-| **APIs Funcionales** | 4 | ✅ 50% OPERATIVO |
-| **APIs Pendientes Token** | 2 | 🔄 ESPERANDO TOKENS |
-| **APIs Bloqueadas** | 2 | ❌ REQUIERE ACCIÓN |
+| **APIs Funcionales** | 6 | ✅ 75% OPERATIVO |
+| **APIs Pendientes Token** | 1 | 🔄 ESPERANDO TOKENS |
+| **APIs Migradas** | 2 | ✅ REE→ESIOS COMPLETO |
 | **Zonas Climáticas** | 4,087/11,830 | 🔄 35% COMPLETO |
 
 ---
@@ -80,17 +80,28 @@ OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 - **Uso**: Benchmarking y validación certificados
 - **Ventaja**: API abierta, sin token requerido
 
+### 6. IDAE Vehículos España
+- **Estado**: ✅ OPERATIVO
+- **URL**: `https://coches.idae.es/storage/csv/idae-historico-202411.csv`
+- **Base de datos**: `db_movilidad.core_vehiculos_espana`
+- **Registros**: 89,542 vehículos únicos, 253 marcas
+- **Uso**: Scoring movilidad, benchmarking eficiencia vehículos
+- **Campos**: Marca, modelo, consumo WLTP, emisiones CO2, autonomía eléctrica
+- **Scoring**: Etiquetas A-G, scores 0-100 por emisiones/consumo/autonomía
+- **Propulsiones**: 79,111 combustión, 4,523 eléctricos, 4,267 híbridos, 1,641 enchufables
+
 ---
 
 ## 🔄 APIs Pendientes de Token
 
 ### 1. ESIOS (REE Oficial)
-- **Estado**: 🔄 ESPERANDO NUEVO TOKEN
-- **Token actual**: `511a5399534031be32848c7fbc85cafc0e618db32c6cbebe5b3d6dd103017ff9` (expirado)
+- **Estado**: ✅ FUNCIONAL
+- **Token actual**: `b5eca74755976ba684c9bc370d6ddd36c35adeeaf3d84c203637847f883600d0` (validado)
 - **Datos**: Datos oficiales sistema eléctrico español
-- **Uso**: Mix energético, emisiones CO2, precios
+- **Uso**: Mix energético, emisiones CO2, precios PVPC
 - **Prioridad**: ALTA - API principal para datos energéticos
-- **Acción**: Solicitar renovación token
+- **Migración**: Completada desde REE bloqueada a ESIOS
+- **Indicadores**: PVPC (1001), Renovable (1433), No Renovable (1434), CO2 (1739)
 
 ### 2. EPREL (European Product Database)
 - **Estado**: 🔄 ESPERANDO TOKEN
@@ -104,54 +115,57 @@ OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 ## ❌ APIs Bloqueadas
 
 ### 1. REE Generación Mix
-- **Estado**: ❌ BLOQUEADA
-- **Endpoint**: `generacion/estructura-generacion`
-- **Error**: HTTP 403/500 - Incapsula/Cloudflare blocking
+- **Estado**: ✅ MIGRADO A ESIOS
+- **Endpoint anterior**: `generacion/estructura-generacion` (bloqueado)
+- **Nuevo endpoint**: ESIOS indicadores 1433/1434
 - **Datos**: Mix energético nacional por horas
-- **Impacto**: ALTO - Crítico para scoring sostenibilidad
+- **Migración**: Completada - usando ESIOS API
 
 ### 2. REE Emisiones CO2
-- **Estado**: ❌ BLOQUEADA
-- **Endpoint**: `generacion/emisiones-co2`
-- **Error**: HTTP 403/500 - Incapsula/Cloudflare blocking
+- **Estado**: ✅ MIGRADO A ESIOS
+- **Endpoint anterior**: `generacion/emisiones-co2` (bloqueado)
+- **Nuevo endpoint**: ESIOS indicador 1739
 - **Datos**: Emisiones CO2 por kWh
-- **Impacto**: ALTO - Esencial para huella carbono
+- **Migración**: Completada - usando ESIOS API
 
 
 ---
 
-## 🔄 Plan de Contingencia
+## 🔄 Migraciones Completadas
 
-### Alternativas Implementadas
+### REE → ESIOS: Migración Exitosa
+
+**Fecha de migración**: 9 de Septiembre de 2025
+**Motivo**: Endpoints REE bloqueados por Incapsula
+**Solución**: Migración completa a ESIOS API oficial
+
+**Componentes migrados**:
+- `omie.py`: Precios PVPC desde ESIOS indicador 1001
+- `ree_api.py`: Mix energético y CO2 desde ESIOS indicadores 1433/1434/1739
+- `fetch_ree_mix_co2.py`: Job automático migrado a ESIOS
+- Jobs cron: Actualizados para usar ESIOS
+
+**Beneficios**:
+- ✅ API oficial más confiable
+- ✅ 1967 indicadores disponibles vs endpoints limitados REE
+- ✅ Sin bloqueos Incapsula
+- ✅ Datos horarios detallados
+- ✅ Autenticación por token estable
+
+### Alternativas Evaluadas
 
 | API Pendiente/Bloqueada | Alternativa | Estado | Prioridad |
 |-------------------------|-------------|--------|-----------|
-| **ESIOS** | Renovar token oficial | 🔄 EN PROCESO | 🔴 ALTA |
+| **ESIOS** | ✅ Token validado | ✅ COMPLETADO | ✅ RESUELTO |
 | **EPREL** | Obtener token nuevo | 🔄 PENDIENTE | 🟡 MEDIA |
-| **REE Mix** | ENTSO-E Transparency | 🔄 PENDIENTE | 🔴 ALTA |
-| **REE CO2** | ENTSO-E Transparency | 🔄 PENDIENTE | 🔴 ALTA |
-
-### ENTSO-E Transparency Platform
-- **URL**: `https://transparency.entsoe.eu/api`
-- **Datos**: Mix energético y CO2 Europa
-- **Ventaja**: API oficial, sin bloqueos
-- **Desventaja**: Requiere registro y token
-
-### Mock Data Temporal
-```python
-# Datos simulados para testing
-mock_co2_data = {
-    "timestamp": "2025-09-09T12:00:00Z",
-    "co2_intensity": 250,  # gCO2/kWh
-    "renewable_percentage": 45.2
-}
-```
+| **REE Mix** | ✅ Migrado a ESIOS | ✅ COMPLETADO | ✅ RESUELTO |
+| **REE CO2** | ✅ Migrado a ESIOS | ✅ COMPLETADO | ✅ RESUELTO |
 
 ---
 
 ## ⚙️ Configuración
 
-### Variables de Entorno
+### Variables de entorno
 
 ```bash
 # APIs Funcionales
@@ -159,11 +173,14 @@ OPEN_METEO_API_KEY=libre
 PVGIS_API_KEY=libre
 NOMINATIM_USER_AGENT="EnergyGreenData/1.0"
 
-# APIs Bloqueadas
-ESIOS_API_TOKEN=511a5399534031be32848c7fbc85cafc0e618db32c6cbebe5b3d6dd103017ff9
-REE_API_BASE=https://apidatos.ree.es/es/datos
+# ESIOS API (Migrado desde REE)
+ESIOS_API_TOKEN=b5eca74755976ba684c9bc370d6ddd36c35adeeaf3d84c203637847f883600d0
+ESIOS_API_BASE=https://api.esios.ree.es
 
-# Alternativas
+# REE (Deprecated - Migrado a ESIOS)
+# REE_API_BASE=https://apidatos.ree.es/es/datos  # BLOQUEADO
+
+# Alternativas futuras
 ENTSO_E_API_TOKEN=pendiente_registro
 ENTSO_E_API_BASE=https://transparency.entsoe.eu/api
 ```
@@ -257,13 +274,15 @@ response = session.get(url, timeout=(5, 30))
 ## 🎯 Roadmap
 
 ### Corto Plazo (1-2 semanas)
-- [ ] Registro ENTSO-E Transparency
-- [ ] Implementar fallback ENTSO-E
+- [x] ✅ Migración REE → ESIOS completada
+- [x] ✅ Jobs automáticos actualizados
+- [x] ✅ Documentación APIs actualizada
 - [ ] Validar Catastro OVC
 - [ ] Completar 7,743 zonas climáticas restantes
 
 ### Medio Plazo (1-2 meses)
-- [ ] Renovar token ESIOS
+- [x] ✅ Token ESIOS validado y funcional
+- [ ] Registro ENTSO-E Transparency (backup)
 - [ ] Implementar cache inteligente
 - [ ] Monitoreo automático APIs
 - [ ] Alertas por fallos

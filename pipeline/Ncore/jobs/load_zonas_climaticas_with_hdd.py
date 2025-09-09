@@ -69,8 +69,8 @@ def get_zona_cte(conn, provincia: str, altitud: float) -> str:
         provincia_normalizada = "Araba/Álava"
     elif provincia == "Vizcaya":
         provincia_normalizada = "Bizkaia"
-    elif provincia == "Guipúzcoa":
-        provincia_normalizada = "Guipúzcoa"
+    elif provincia == "Guipúzcoa" or provincia == "Gipuzkoa":
+        provincia_normalizada = "Gipuzkoa"
     
     cursor.execute("""
         SELECT zona_climatica_cte 
@@ -126,6 +126,9 @@ def get_hdd_cdd_open_meteo(lat: float, lon: float):
             'daily': 'temperature_2m_mean',
             'timezone': 'Europe/Madrid'
         }
+        
+        # Delay para evitar rate limiting
+        time.sleep(0.5)  # 500ms entre peticiones
         
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()

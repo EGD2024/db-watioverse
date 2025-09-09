@@ -55,9 +55,9 @@ DB_PATH=$DB_PATH
 
 # ====== JOBS DE ACTUALIZACIÓN FRECUENTE ======
 
-# 3. REE Mix generación y CO2 (cada hora a los 20 minutos)
-# Descarga mix de generación y emisiones CO2 desde REE
-20 * * * * cd \$DB_PATH && source venv/bin/activate && python pipeline/Ncore/jobs/fetch_ree_mix_co2.py >> logs/ree_mix.log 2>&1
+# 3. ESIOS Mix generación y CO2 (cada hora a los 20 minutos)
+# Descarga mix de generación y emisiones CO2 desde ESIOS API
+20 * * * * cd \$DB_PATH && source venv/bin/activate && python pipeline/Ncore/jobs/fetch_ree_mix_co2.py >> logs/esios_mix.log 2>&1
 
 # 4. PVPC incremental rápido (cada 30 minutos)
 # Mantiene core_precios_omie actualizado con últimos 2 días
@@ -94,16 +94,22 @@ for row in cur.fetchall():
     print(f'{row[0]}: {row[1]}')
 conn.close()
 " >> logs/health_check.log 2>&1
+
+# 8. Continuación automática zonas climáticas (2:00 AM diario)
+# Continúa carga de zonas climáticas después del reset límite Open-Meteo
+0 2 * * * cd \$DB_PATH && source venv/bin/activate && python pipeline/Ncore/jobs/resume_zonas_climaticas_auto.py >> logs/zonas_climaticas_auto.log 2>&1
+
 EOF
 
 echo -e "${YELLOW}Jobs a instalar:${NC}"
 echo "  1. update_pvpc_simple.py      - Diario 5:30 AM"
 echo "  2. sync_all_to_ncore.py       - Diario 6:00 AM"
-echo "  3. fetch_ree_mix_co2.py       - Cada hora"
+echo "  3. fetch_ree_mix_co2.py       - Cada hora (ESIOS API)"
 echo "  4. backfill_pvpc_to_ncore.py  - Cada 30 minutos"
 echo "  5. sync_boe_to_ncore.py       - Semanal (domingos)"
 echo "  6. Limpieza logs              - Mensual"
 echo "  7. Health check               - Diario 7:00 AM"
+echo "  8. Zonas climáticas auto      - Diario 2:00 AM"
 echo ""
 
 # Preguntar confirmación

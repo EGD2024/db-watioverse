@@ -187,7 +187,7 @@ enrichment_cache(
 | **Catastro** | Características edificios | 100/min | ❌ Referencias catastrales |
 | **OMIE** | Precios mercado eléctrico | 100/min | ❌ Datos públicos |
 | **CNMC** | Tarifas reguladas | 30/min | ❌ Normativa pública |
-| **REE** | Sistema eléctrico nacional | 100/min | ❌ Datos agregados |
+| **ESIOS** | Sistema eléctrico nacional | 100/min | ❌ Datos agregados |
 | **INE** | Demografía territorial | 50/min | ❌ Estadísticas públicas |
 
 ### Proceso de Enriquecimiento Asíncrono

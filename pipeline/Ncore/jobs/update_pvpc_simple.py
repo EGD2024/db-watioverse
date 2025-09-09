@@ -2,6 +2,7 @@
 """
 Script simplificado para actualizar precios_horarios_pvpc en db_sistema_electrico.
 Enfoque directo: lee OMIE y calendario, calcula PVPC, inserta.
+Migrado para usar datos de ESIOS API en lugar de REE.
 """
 
 import psycopg2
