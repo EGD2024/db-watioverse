@@ -13,6 +13,7 @@ import os
 import sys
 import json
 import time
+import random
 import argparse
 from datetime import datetime, timedelta, timezone
 
@@ -36,7 +37,16 @@ REE_MIX_ENDPOINT = f"{REE_BASE}/generacion/estructura-generacion"
 REE_CO2_ENDPOINT = f"{REE_BASE}/generacion/emisiones-co2"
 
 HEADERS = {
-    'User-Agent': 'VagalumeEnergia/1.0 (ree-mix-co2-ingest)'
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Referer': 'https://www.ree.es/es/datos',
+    'Origin': 'https://www.ree.es',
+    'Connection': 'keep-alive',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site'
 }
 
 
@@ -48,18 +58,29 @@ def iso_day_bounds(day: datetime):
 
 
 def fetch_json(url: str, params: dict) -> dict:
-    """Descarga JSON con hasta 4 reintentos (1s, 2s, 4s)."""
-    delay = 1.0
+    """Descarga JSON con hasta 4 reintentos y delays aleatorios."""
+    delay = random.uniform(2.0, 4.0)  # Delay inicial aleatorio
     last_err = None
-    for _ in range(4):
+    
+    for attempt in range(4):
         try:
-            r = requests.get(url, params=params, headers=HEADERS, timeout=30)
+            # Delay aleatorio antes de cada intento (excepto el primero)
+            if attempt > 0:
+                time.sleep(delay)
+            
+            # Session para mantener cookies
+            session = requests.Session()
+            session.headers.update(HEADERS)
+            
+            r = session.get(url, params=params, timeout=45)
             r.raise_for_status()
             return r.json()
+            
         except Exception as e:
             last_err = e
-            time.sleep(delay)
-            delay *= 2
+            print(f"❌ Intento {attempt + 1}/4 falló: {e}")
+            delay = random.uniform(delay * 1.5, delay * 2.5)  # Backoff aleatorio
+            
     raise last_err
 
 
