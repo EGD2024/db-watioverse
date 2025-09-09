@@ -15,9 +15,12 @@ Fecha de generación: 2025-09-09
 - Descripción General
 - Arquitectura del Sistema
 - Base de Datos — Esquema actual (MCP)
+- Mapa de bases de datos (responsabilidades y ubicación)
 - Indicadores ESIOS confirmados y mapeo
+- Cobertura completa de indicadores (SCORE y Redes Sociales)
 - Elementos críticos para simulación PVPC/Indexado
 - Nuevas tablas propuestas (ESIOS)
+- Normalización temporal y versionado (obligatorio)
 - Redes sociales — modelo propuesto
 - Propuesta final (sin cambios estructurales)
 - Próximos pasos
@@ -151,6 +154,60 @@ A continuación se listan las tablas y vistas relevantes del esquema `public` en
 
 ---
 
+## 🗺️ Mapa de bases de datos (responsabilidades y ubicación)
+
+Resumen de dónde residirá cada componente, siguiendo la arquitectura N0→N1→N2→eSCORE y la separación por responsabilidades:
+
+- db_sistema_electrico (actual)
+  - Mantiene tablas de dominio eléctrico ya existentes: `omie_precios`, `precios_horarios_pvpc`, `precio_regulado_boe`, `calendario_tarifario_YYYY`, `historico_iva`, `historico_impuesto_electrico`, y sus vistas.
+  - Uso: consulta operativa y simulación PVPC/indexado (★), sin almacenar crudos de ESIOS.
+
+- db_Ncore (nueva capa para ESIOS)
+  - Nuevas tablas genéricas de ESIOS: `core_esios_indicador`, `core_esios_valor_horario`, `core_esios_ingesta_ejecucion`.
+  - Vistas canónicas por ID: `v_esios_ind_{ID}` y alias (`v_esios_pvpc_horario`, etc.).
+  - Agregados de conveniencia: `core_esios_*_diario` y modelo RRSS.
+  - Uso: ingesta cruda, versionado, normalización temporal y exposición estandarizada por indicador.
+
+- db_eSCORE_* (lectura/negocio)
+  - Bases oficiales del scoring (p. ej., `db_eSCORE_master`, `db_eSCORE_def`, `db_eSCORE_contx`, `db_eSCORE_pesos`).
+  - Uso: pesos y lógica de scoring. No almacena crudos ESIOS; consume N1+N2 y/o agregados expuestos desde `db_Ncore`.
+
+```mermaid
+flowchart LR
+  subgraph NCORE[db_Ncore]
+    IND[core_esios_indicador]
+    VAL[core_esios_valor_horario]
+    ING[core_esios_ingesta_ejecucion]
+    VIEWS[v_esios_ind_{ID}]
+  end
+
+  subgraph SE[db_sistema_electrico]
+    OM[omie_precios]
+    PV[precios_horarios_pvpc ★]
+    BO[precio_regulado_boe ★]
+    CAL[calendario_tarifario_YYYY ★]
+  end
+
+  subgraph ES[db_eSCORE_*]
+    PESOS[pesos & lógica]
+  end
+
+  VIEWS --> SE
+  VAL --> VIEWS
+  IND --> VAL
+  SE --> ES
+
+  style NCORE fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+  style SE fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+  style ES fill:#34495E,stroke:#ffffff,stroke-width:2px,color:#ffffff
+```
+
+Decisión principal:
+- Los indicadores ESIOS (1001, 1002, 600, 601, 1900, 1901, y resto del catálogo) se guardan en `db_Ncore` (tablas `core_esios_*`).
+- `db_sistema_electrico` permanece como capa de consumo/simulación con sus tablas actuales; podrá leer de `db_Ncore` para componer `precios_horarios_pvpc` cuando aplique.
+
+---
+
 ## Indicadores ESIOS confirmados y mapeo
 
 A fecha de este documento, en el código del repositorio se usan los siguientes indicadores ESIOS (confirmados en jobs y módulos):
@@ -169,6 +226,89 @@ Correspondencia actual con tablas:
 - 1739 → Se utiliza para completar `core_ree_emisiones_horario` (Ncore) con datos ESIOS.
 
 ---
+
+## Cobertura completa de indicadores (SCORE y Redes Sociales)
+
+Todos los indicadores de la lista solicitada quedan cubiertos por el modelo genérico `db_Ncore.core_esios_indicador` + `db_Ncore.core_esios_valor_horario` y se exponen mediante vistas por ID con el patrón:
+
+- `db_Ncore.v_esios_ind_{ID}` (ej.: `v_esios_ind_1001`), y opcionalmente alias descriptivo (ej.: `v_esios_pvpc_horario`).
+
+Listado por categorías (IDs proporcionados):
+
+1) Precios y Costes Energéticos
+- 1001 (PVPC 2.0TD) ★
+- 1002 (PVPC 3.0TD)
+- 600 (Precio mercado diario)
+- 601 (Precio mercado intradiario)
+- 1900 (Peajes de transporte)
+- 1901 (Cargos del sistema)
+
+2) Calidad y Eficiencia del Suministro
+- 1295 (Pérdidas en transporte)
+- 1296 (Pérdidas en distribución)
+- 1350 (TIEPI)
+- 1351 (NIEPI)
+- 1400 (Factor de potencia)
+
+3) Mix Energético Detallado
+- 1433 (Generación renovable) — YA USADO
+- 1434 (Generación no renovable) — YA USADO
+- 1435 (Generación eólica)
+- 1436 (Generación solar fotovoltaica)
+- 1437 (Generación hidráulica)
+- 1438 (Generación nuclear)
+- 1440 (Generación cogeneración)
+
+4) Demanda y Patrones de Consumo
+- 1293 (Demanda en tiempo real) — YA USADO
+- 1294 (Demanda prevista)
+- 1310 (Demanda industrial)
+- 1311 (Demanda residencial)
+- 1312 (Demanda servicios)
+- 1320 (Punta de demanda diaria)
+
+5) Almacenamiento y Flexibilidad
+- 1500 (Bombeo hidráulico)
+- 1501 (Baterías del sistema)
+- 1502 (Gestión de demanda)
+- 1510 (Servicios de ajuste)
+
+6) Emisiones y Transición
+- 1739 (Emisiones de CO2) — YA USADO
+- 1460 (Cierre centrales carbón)
+- 1461 (Nueva potencia renovable)
+
+7) Autoconsumo y movilidad
+- 1450 (Autoproducción solar)
+- 1470 (Electrolineras)
+- 1480 (Autoconsumo residencial)
+
+8) Interconexiones y comparativas
+- 1800 (Intercambios Francia)
+- 1801 (Intercambios Portugal)
+- 1802 (Intercambios Marruecos)
+
+9) Eventos estacionales
+- 1600 (Demanda navideña)
+- 1601 (Demanda verano)
+- 1602 (Generación durante eclipse)
+- 1603 (Temporal y eólica)
+
+Implementación:
+- Catálogo: todos los IDs quedarán insertados en `core_esios_indicador` con su `unidad`, `geo_id` y `descripcion`.
+- Valores horarios: se almacenarán en `core_esios_valor_horario` (UTC) y se expondrán en vistas `v_esios_ind_{ID}`.
+- Agregados y RRSS: usarán las tablas de agregados y el modelo de eventos documentados más abajo.
+
+### Resumen de cobertura — Precios y costes energéticos
+
+| ID   | Indicador                  | Tabla base                          | Vista canónica              | Estado            |
+|------|----------------------------|-------------------------------------|-----------------------------|-------------------|
+| 1001 | PVPC 2.0TD                 | `db_Ncore.core_esios_valor_horario` | `db_Ncore.v_esios_ind_1001` | YA USADO          |
+| 1002 | PVPC 3.0TD                 | `db_Ncore.core_esios_valor_horario` | `db_Ncore.v_esios_ind_1002` | CUBIERTO EN PLAN  |
+| 600  | Precio mercado diario      | `db_Ncore.core_esios_valor_horario` | `db_Ncore.v_esios_ind_600`  | CUBIERTO EN PLAN  |
+| 601  | Precio mercado intradiario | `db_Ncore.core_esios_valor_horario` | `db_Ncore.v_esios_ind_601`  | CUBIERTO EN PLAN  |
+| 1900 | Peajes de transporte       | `db_Ncore.core_esios_valor_horario` | `db_Ncore.v_esios_ind_1900` | CUBIERTO EN PLAN  |
+| 1901 | Cargos del sistema         | `db_Ncore.core_esios_valor_horario` | `db_Ncore.v_esios_ind_1901` | CUBIERTO EN PLAN  |
 
 ## ★ Elementos críticos para simulación PVPC / Indexado
 
@@ -280,6 +420,19 @@ CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_valor_horario (
 );
 CREATE INDEX IF NOT EXISTS idx_esios_valor_hora ON db_Ncore.core_esios_valor_horario (fecha_hora);
 
+-- Seguimiento de ejecuciones y versionado de ingestas (obligatorio)
+CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_ingesta_ejecucion (
+  id_ingesta bigserial PRIMARY KEY,
+  indicator_id integer NOT NULL REFERENCES db_Ncore.core_esios_indicador(indicator_id),
+  geo_id integer NOT NULL DEFAULT 8741,
+  ts_inicio timestamptz NOT NULL DEFAULT now(),
+  ts_fin timestamptz,
+  version_fuente text,      -- versión/corte publicado por ESIOS
+  filas_afectadas integer,
+  estado text NOT NULL DEFAULT 'ok', -- ok|warning|error
+  mensaje text
+);
+
 -- Agregados diarios
 CREATE TABLE IF NOT EXISTS db_Ncore.core_esios_pvpc_diario (
   dia date PRIMARY KEY,
@@ -337,6 +490,50 @@ CREATE INDEX IF NOT EXISTS idx_evento_social_dia ON db_Ncore.core_esios_evento_s
 ```
 
 ---
+
+## Normalización temporal y versionado (obligatorio)
+
+### Normalización temporal
+- Almacenamiento en UTC: `core_esios_valor_horario.fecha_hora` es `timestamptz` y se guarda en UTC.
+- Conversión local para consultas: usar `fecha_hora AT TIME ZONE 'Europe/Madrid'` cuando se necesite agrupar por día/hora local.
+- Manejo DST: hay días de 23/25 horas. No asumir 24 horas fijas; agrupar por `date(fecha_hora AT TIME ZONE 'Europe/Madrid')`.
+- Unicidad y idempotencia: PK compuesta (`indicator_id`, `fecha_hora`, `geo_id`). Ingestas hacen UPSERT sobre esa PK.
+- Índices: `idx_esios_valor_hora(fecha_hora)` ya propuesto; añadir si procede `idx_esios_valor_id_hora(indicator_id, fecha_hora)` para consultas por indicador.
+
+### Versionado y trazabilidad
+- Catálogo: `core_esios_indicador.ultima_actualizacion` refleja la última ingesta exitosa por indicador.
+- Ejecuciones: `core_esios_ingesta_ejecucion` registra cada job (inicio/fin, filas, estado, mensajes).
+- `version_fuente`: cadena opcional con metadatos de la respuesta ESIOS (p. ej., cortes temporales/fechas de publicación si están disponibles) para reproducibilidad.
+
+### Política sin fallbacks (ESC público)
+- Si un indicador con peso oficial > 0 (Eficiencia, Sostenibilidad, Coste) no está disponible en el rango temporal evaluado, la capa de negocio debe lanzar excepción (no se suple con proxies).
+
+### Vistas estándar por indicador
+Se definen vistas canónicas `v_esios_ind_{ID}` para consumo consistente. Ejemplos:
+
+```sql
+CREATE OR REPLACE VIEW db_Ncore.v_esios_ind_1002 AS
+SELECT fecha_hora, geo_id, valor FROM db_Ncore.core_esios_valor_horario
+WHERE indicator_id = 1002;
+
+CREATE OR REPLACE VIEW db_Ncore.v_esios_ind_600 AS
+SELECT fecha_hora, geo_id, valor FROM db_Ncore.core_esios_valor_horario
+WHERE indicator_id = 600;
+
+CREATE OR REPLACE VIEW db_Ncore.v_esios_ind_601 AS
+SELECT fecha_hora, geo_id, valor FROM db_Ncore.core_esios_valor_horario
+WHERE indicator_id = 601;
+
+CREATE OR REPLACE VIEW db_Ncore.v_esios_ind_1900 AS
+SELECT fecha_hora, geo_id, valor FROM db_Ncore.core_esios_valor_horario
+WHERE indicator_id = 1900;
+
+CREATE OR REPLACE VIEW db_Ncore.v_esios_ind_1901 AS
+SELECT fecha_hora, geo_id, valor FROM db_Ncore.core_esios_valor_horario
+WHERE indicator_id = 1901;
+```
+
+Alias descriptivos (opcionales): `v_esios_pvpc_3p` (1002), `v_esios_mercado_diario` (600), `v_esios_intradiario` (601), `v_esios_peajes_transporte` (1900), `v_esios_cargos_sistema` (1901).
 
 ## Redes sociales — modelo propuesto
 
