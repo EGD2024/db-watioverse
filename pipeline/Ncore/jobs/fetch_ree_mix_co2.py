@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Job de ingesta REE: mix de generación y factor de emisiones CO2 (horario).
-- Almacena RAW por fecha (jsonb) para resiliencia ante cambios de esquema.
-- Normaliza a tablas horarias cuando el payload incluye la estructura esperada.
-- Idempotente: upsert por claves primarias.
-- Estricto: nombres reales de BD/tablas; si falla la consulta remota, no se inventan datos.
+Job de ingesta REE usando endpoint de mercados (funcional):
+- Obtiene datos PVPC desde endpoint mercados/precios-mercados-tiempo-real
+- Almacena RAW por fecha (jsonb) para resiliencia ante cambios de esquema
+- Para mix energético y CO2: usar fetch_ree_alternative.py hasta resolver bloqueo API
+- Idempotente: upsert por claves primarias
+- Estricto: nombres reales de BD/tablas; si falla la consulta remota, no se inventan datos
 
 Uso:
   --date YYYY-MM-DD   Fecha de referencia (por defecto: ayer)
@@ -30,11 +31,11 @@ DB = {
 
 # Endpoints REE (dataset públicos)
 REE_BASE = "https://apidatos.ree.es/es/datos"
-# Mix de generación (Estructura de generación)
-REE_MIX_ENDPOINT = f"{REE_BASE}/generacion/estructura-generacion"
-# Factor de emisión horario (intensidad de carbono del mix)
-# Dataset puede variar; se usa emisiones-co2 como recurso horario
-REE_CO2_ENDPOINT = f"{REE_BASE}/generacion/emisiones-co2"
+# ENDPOINT FUNCIONAL: Mercados (incluye PVPC y otros datos)
+REE_MERCADOS_ENDPOINT = f"{REE_BASE}/mercados/precios-mercados-tiempo-real"
+# Endpoints originales (bloqueados por Incapsula)
+# REE_MIX_ENDPOINT = f"{REE_BASE}/generacion/estructura-generacion"
+# REE_CO2_ENDPOINT = f"{REE_BASE}/generacion/emisiones-co2"
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -180,6 +181,45 @@ def normalize_co2(conn, payload: dict):
     return len(rows)
 
 
+def fetch_mercados_data(conn, day, params):
+    """Obtiene datos de mercados REE (PVPC y otros indicadores)."""
+    try:
+        payload = fetch_json(REE_MERCADOS_ENDPOINT, params)
+        upsert_raw(conn, 'core_ree_mercados_json', day.isoformat(), payload)
+        
+        # Extraer datos PVPC si están disponibles
+        included = payload.get('included', [])
+        pvpc_rows = 0
+        
+        for item in included:
+            if item.get('type') == 'PVPC':
+                values = item.get('attributes', {}).get('values', [])
+                for val in values:
+                    dt_str = val.get('datetime')
+                    price = val.get('value')
+                    if dt_str and price is not None:
+                        try:
+                            ts = datetime.fromisoformat(dt_str.replace('Z','+00:00')).replace(tzinfo=None)
+                            # Insertar en tabla de precios si existe
+                            cur = conn.cursor()
+                            cur.execute("""
+                                INSERT INTO core_precios_omie (timestamp_hora, precio_spot, fuente)
+                                VALUES (%s, %s, %s)
+                                ON CONFLICT (timestamp_hora) DO UPDATE SET
+                                  precio_spot = EXCLUDED.precio_spot,
+                                  fecha_publicacion = CURRENT_TIMESTAMP
+                            """, (ts, price/1000, 'REE-MERCADOS'))  # Convertir a EUR/kWh
+                            cur.close()
+                            pvpc_rows += 1
+                        except Exception as e:
+                            continue
+        
+        return pvpc_rows
+        
+    except Exception as e:
+        print(f"❌ REE MERCADOS error: {e}")
+        return 0
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', help='YYYY-MM-DD (por defecto: ayer)')
@@ -202,29 +242,16 @@ def main():
     # Conexión BD
     conn = psycopg2.connect(**DB)
 
-    n_mix = 0
-    n_co2 = 0
-
-    # 1) MIX
-    try:
-        mix_payload = fetch_json(REE_MIX_ENDPOINT, params)
-        upsert_raw(conn, 'core_ree_mix_json', day.isoformat(), mix_payload)
-        n_mix = normalize_mix(conn, mix_payload)
-    except Exception as e:
-        print(f"❌ REE MIX error: {e}")
-
-    # 2) CO2
-    try:
-        co2_payload = fetch_json(REE_CO2_ENDPOINT, params)
-        upsert_raw(conn, 'core_ree_co2_json', day.isoformat(), co2_payload)
-        n_co2 = normalize_co2(conn, co2_payload)
-    except Exception as e:
-        print(f"❌ REE CO2 error: {e}")
+    # Usar endpoint de mercados que SÍ funciona
+    n_mercados = fetch_mercados_data(conn, day, params)
+    
+    # Mantener datos mock para mix/CO2 hasta encontrar fuente real
+    print(f"ℹ️  Para mix energético y CO2, usar: python fetch_ree_alternative.py --source mock --date {day}")
 
     conn.commit()
     conn.close()
 
-    print(f"✅ REE {day}: mix filas={n_mix}, co2 filas={n_co2}")
+    print(f"✅ REE {day}: mercados filas={n_mercados} (mix/CO2 pendientes de fuente alternativa)")
 
 
 if __name__ == '__main__':

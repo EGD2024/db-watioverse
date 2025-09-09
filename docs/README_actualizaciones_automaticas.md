@@ -134,6 +134,7 @@ flowchart LR
 | **PVPC Incremental** | <span style="color:#9B59B6">**Cada 30min**</span> | `backfill_pvpc_to_ncore.py` | Mantiene core_precios_omie al día (últimos 2 días) |
 | **REE Mix/CO2** | <span style="color:#9B59B6">**Cada hora**</span> | `fetch_ree_mix_co2.py` | Mix generación y emisiones CO2 desde REE |
 | **BOE Regulado** | <span style="color:#9B59B6">**Domingos 03:00**</span> | `sync_boe_to_ncore.py` | Sincroniza precios regulados BOE |
+| **Códigos Postales** | <span style="color:#9B59B6">**Cada 6 meses**</span> | `ejecutar_poblado_cp.py` | Validación y actualización territorial |
 
 ### Jobs Legacy (LaunchAgents/psql)
 
@@ -208,6 +209,15 @@ Scripts principales en `pipeline/Ncore/jobs/`:
 
 - Zonas climáticas HDD/CDD (Ncore):
   - `~/Library/LaunchAgents/com.vagalume.zonas_climaticas.load_overnight.plist` (01:05) - 11,830 CP con HDD/CDD→Ncore
+
+- **Códigos Postales Territoriales (db_territorio):**
+  - **Poblado masivo:** Sistema completo con 17,009 códigos postales de España (52 provincias)
+  - **Validación automática:** Verificación de integridad y corrección de asociaciones erróneas
+  - **Frecuencia recomendada:** **Cada 6 meses** (códigos postales cambian muy poco)
+  - **Scripts disponibles:**
+    - `motores/motor_extraccion/ejecutar_poblado_cp.py --modo validar` - Validación de integridad
+    - `motores/motor_extraccion/ejecutar_poblado_cp.py --modo corregir` - Corrección automática
+    - `motores/motor_extraccion/ejecutar_poblado_cp.py --modo completo` - Poblado completo (17K CPs)
 
 Observación:
 - Los nuevos jobs Python son idempotentes y manejan reintentos automáticos
@@ -301,6 +311,35 @@ SELECT provincia, zona_climatica_cte, COUNT(*) AS municipios,
 FROM core_zonas_climaticas
 GROUP BY 1, 2
 ORDER BY 1, 2;
+```
+
+- Verificación códigos postales territoriales:
+
+```sql
+-- Estado general de códigos postales por provincia
+SELECT p.nombre_provincia, COUNT(lcp.codigo_postal) as total_cp,
+       COUNT(DISTINCT l.nombre_localidad) as localidades_con_cp
+FROM localidad_codigos_postales lcp
+JOIN localidades l ON lcp.id_localidad = l.id_localidad
+JOIN provincias p ON l.id_provincia = p.id_provincia
+GROUP BY p.nombre_provincia, p.id_provincia
+ORDER BY p.id_provincia;
+```
+
+```sql
+-- Validación de integridad territorial (debe devolver 0 errores)
+SELECT 'CP con formato incorrecto' as tipo_error, COUNT(*) as cantidad
+FROM localidad_codigos_postales 
+WHERE codigo_postal !~ '^[0-9]{5}$'
+UNION ALL
+SELECT 'CP fuera de rango español', COUNT(*)
+FROM localidad_codigos_postales 
+WHERE codigo_postal::integer NOT BETWEEN 1000 AND 52999
+UNION ALL
+SELECT 'Asociaciones geográficas erróneas', COUNT(*)
+FROM localidad_codigos_postales lcp
+JOIN localidades l ON lcp.id_localidad = l.id_localidad
+WHERE LEFT(lcp.codigo_postal, 2)::integer != l.id_provincia;
 ```
 
 ## 🧭 Notas de Operación

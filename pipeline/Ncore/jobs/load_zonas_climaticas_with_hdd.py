@@ -52,6 +52,26 @@ PROVINCIA_POR_CP = {
 def get_zona_cte(conn, provincia: str, altitud: float) -> str:
     """Obtener zona CTE según provincia y altitud usando core_zonas_cte_reglas (sin defaults)."""
     cursor = conn.cursor()
+    
+    # Mapeo de nombres de provincia para casos especiales
+    provincia_normalizada = provincia
+    if provincia == "A Coruña":
+        provincia_normalizada = "Coruña, A"
+    elif provincia == "Alicante":
+        provincia_normalizada = "Alicante/Alacant"
+    elif provincia == "Castellón":
+        provincia_normalizada = "Castellón/Castelló"
+    elif provincia == "Valencia":
+        provincia_normalizada = "Valencia/València"
+    elif provincia == "Lleida":
+        provincia_normalizada = "Lleida"
+    elif provincia == "Álava":
+        provincia_normalizada = "Araba/Álava"
+    elif provincia == "Vizcaya":
+        provincia_normalizada = "Bizkaia"
+    elif provincia == "Guipúzcoa":
+        provincia_normalizada = "Guipúzcoa"
+    
     cursor.execute("""
         SELECT zona_climatica_cte 
         FROM core_zonas_cte_reglas
@@ -59,12 +79,12 @@ def get_zona_cte(conn, provincia: str, altitud: float) -> str:
           AND %s >= h_min 
           AND %s <= h_max
         LIMIT 1
-    """, (provincia, altitud, altitud))
+    """, (provincia_normalizada, altitud, altitud))
     
     result = cursor.fetchone()
     cursor.close()
     if not result:
-        raise RuntimeError(f"No hay regla CTE para provincia={provincia} altitud={altitud}")
+        raise RuntimeError(f"No hay regla CTE para provincia={provincia} (normalizada: {provincia_normalizada}) altitud={altitud}")
     return result[0]
 
 def get_coordinates_nominatim(municipio: str, provincia: str):
