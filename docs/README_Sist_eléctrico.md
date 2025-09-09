@@ -12,18 +12,18 @@ Fecha de generación: 2025-09-09
 
 ## 📑 Tabla de Contenidos
 
- - [Descripción General](#-descripción-general)
- - [Arquitectura del Sistema](#-arquitectura-del-sistema)
- - [Base de Datos — Esquema actual (consultado por MCP)](#-base-de-datos--esquema-actual-consultado-por-mcp)
- - [Mapa de bases de datos (responsabilidades y ubicación)](#-mapa-de-bases-de-datos-responsabilidades-y-ubicación)
- - [Indicadores ESIOS confirmados y mapeo](#-indicadores-esios-confirmados-y-mapeo)
- - [Cobertura completa de indicadores (SCORE y Redes Sociales)](#-cobertura-completa-de-indicadores-score-y-redes-sociales)
- - [Elementos críticos para simulación PVPC / Indexado](#-elementos-críticos-para-simulación-pvpc--indexado)
- - [Nuevas tablas propuestas (ESIOS)](#-nuevas-tablas-propuestas-esios)
- - [Normalización temporal y versionado (obligatorio)](#-normalización-temporal-y-versionado-obligatorio)
- - [Redes sociales — modelo propuesto](#-redes-sociales--modelo-propuesto)
- - [Propuesta final (sin cambios estructurales)](#-propuesta-final-sin-cambios-estructurales)
- - [Próximos pasos](#-próximos-pasos)
+ - [Descripción General](#descripción-general)
+ - [Arquitectura del Sistema](#arquitectura-del-sistema)
+ - [Base de Datos — Esquema actual (consultado por MCP)](#base-de-datos--esquema-actual-consultado-por-mcp)
+ - [Mapa de bases de datos (responsabilidades y ubicación)](#mapa-de-bases-de-datos-responsabilidades-y-ubicación)
+ - [Indicadores ESIOS confirmados y mapeo](#indicadores-esios-confirmados-y-mapeo)
+ - [Cobertura completa de indicadores (SCORE y Redes Sociales)](#cobertura-completa-de-indicadores-score-y-redes-sociales)
+ - [Elementos críticos para simulación PVPC / Indexado](#elementos-críticos-para-simulación-pvpc--indexado)
+ - [Nuevas tablas propuestas (ESIOS)](#nuevas-tablas-propuestas-esios)
+ - [Normalización temporal y versionado (obligatorio)](#normalización-temporal-y-versionado-obligatorio)
+ - [Redes sociales — modelo propuesto](#redes-sociales--modelo-propuesto)
+ - [Propuesta final (sin cambios estructurales)](#propuesta-final-sin-cambios-estructurales)
+ - [Próximos pasos](#próximos-pasos)
 
 ---
 
@@ -42,12 +42,12 @@ flowchart LR
     end
 
     subgraph SE[db_sistema_electrico]
-        OM[(omie_precios)]
-        PVPC[(precios_horarios_pvpc)]
-        BOE_TAB[(precio_regulado_boe)]
-        CAL[(calendario_tarifario_2025)]
-        IVA[(historico_iva)]
-        IE[(historico_impuesto_electrico)]
+        OM[omie_precios]
+        PVPC[precios_horarios_pvpc]
+        BOE_TAB[precio_regulado_boe]
+        CAL[calendario_tarifario_2025]
+        IVA[historico_iva]
+        IE[historico_impuesto_electrico]
     end
 
     subgraph NCORE[db_Ncore]
@@ -188,7 +188,7 @@ flowchart LR
     CAL[calendario_tarifario_YYYY]
   end
 
-  subgraph ES[db_eSCORE_*]
+  subgraph ES[db_eSCORE]
     PESOS[pesos & lógica]
   end
 
