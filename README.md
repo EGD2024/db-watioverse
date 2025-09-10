@@ -1,63 +1,138 @@
-<p align="center">
-  <img src="docs/assets/EGD.png" alt="Energy Green Data" width="400"/>
-</p>
+<div align="center">
+  <img src="docs/assets/EGD.png" alt="Energy Green Data" width="300" style="margin: 20px 0;"/>
+</div>
 
-# db_watioverse - Ecosistema de Datos Energéticos
+# 🗄️ db_watioverse - Ecosistema de Datos Energéticos
 
 ![Versión](https://img.shields.io/badge/versión-3.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
-![Python](https://img.shields.io/badge/python-3.8+-green)
-![Pipeline](https://img.shields.io/badge/pipeline-N0→N1→N2→N3-purple)
 ![Bases](https://img.shields.io/badge/bases_de_datos-28-orange)
-![MCP](https://img.shields.io/badge/MCP-28_conectadas-green)
-![APIs](https://img.shields.io/badge/APIs-4_funcionales_2_tokens-yellow)
 
-**Repositorio de capas de datos para el procesamiento y análisis de información energética con integración híbrida al Motor eSCORE**
-
-**Última actualización:** 9 de Septiembre de 2025
-**Actualizado por:** Auditoría MCP Exhaustiva
+**Módulo:** db_watioverse  
 **Proyecto interno de Energy Green Data**
 
 ---
 
-## Tabla de Contenidos
+## 📑 Tabla de Contenidos
 
-- [Documentación Especializada](#documentación-especializada)
-- [Integración Híbrida con eSCORE](#integración-híbrida-con-escore)
-- [Estructura del Repositorio](#estructura-del-repositorio)
-- [Pipeline N0→N1](#pipeline-n0n1)
-- [Configuración del Entorno](#configuración-del-entorno)
-- [Capa N0 - Datos en Bruto](#capa-n0---datos-en-bruto)
-- [Flujo de Datos](#flujo-de-datos)
+- [Descripción General](#-descripción-general)
+- [Arquitectura del Sistema](#️-arquitectura-del-sistema)
+- [Pipeline de Datos](#-pipeline-de-datos)
+- [Instalación y Configuración](#-instalación-y-configuración)
+- [Casos de Uso](#-casos-de-uso)
+
+## 🎯 Descripción General
+
+Ecosistema de capas de datos para el procesamiento y análisis de información energética con integración híbrida al Motor eSCORE. Gestiona 28 bases de datos PostgreSQL con pipeline automatizado N0→N1→N2→N3→N4→N5.
+
+### 🏗️ Arquitectura del Sistema
+
+```mermaid
+graph TD
+    A[N0 Datos Brutos] --> B[Pipeline N0→N1]
+    B --> C[N1 Datos Enriquecidos]
+    C --> D[Pipeline N1→N2]
+    D --> E[N2 Datos Contextuales]
+    E --> F[Pipeline N2→N3]
+    F --> G[N3 Datos Calculados]
+    G --> H[Motor eSCORE]
+    
+    I[28 Bases PostgreSQL] --> J[MCP Conectores]
+    J --> K[APIs Externas]
+    K --> L[Seguridad RGPD]
+    
+    style A fill:#2C3E50,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style B fill:#1ABC9C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style C fill:#F39C12,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style D fill:#9B59B6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style E fill:#E74C3C,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style F fill:#95A5A6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style G fill:#16A085,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style H fill:#D35400,stroke:#ffffff,stroke-width:2px,color:#ffffff
+```
+
+## 📊 Pipeline de Datos
+
+### Capas del Ecosistema
+| Capa | Descripción | Estado | Tablas |
+|------|-------------|--------|--------|
+| **N0** | Datos brutos de facturas | ✅ Activo | 15+ |
+| **N1** | Datos enriquecidos | ✅ Activo | 20+ |
+| **N2** | Datos contextuales | ✅ Activo | 25+ |
+| **N3** | Datos calculados | ✅ Activo | 30+ |
+| **N4** | Datos agregados | ⏳ Desarrollo | 10+ |
+| **N5** | Datos eSCORE | ⏳ Desarrollo | 5+ |
+
+### Bases de Datos Conectadas
+| Base | Función | MCP | Estado |
+|------|---------|-----|--------|
+| **N0-N5** | Pipeline principal | ✅ | Activo |
+| **Ncore** | Datos maestros | ✅ | Activo |
+| **Sistema Eléctrico** | Tarifas y precios | ✅ | Activo |
+| **Territorio** | Códigos postales | ✅ | Activo |
+| **Comercializadora** | Empresas | ✅ | Activo |
+| **Distribuidora** | Redes | ✅ | Activo |
+| **CAES** | Certificados | ✅ | Activo |
+| **Movilidad** | Vehículos | ✅ | Activo |
+
+### APIs Integradas
+| API | Estado | Función | Tokens |
+|-----|--------|---------|--------|
+| **Nominatim** | ✅ Funcional | Geocodificación | Sin límite |
+| **Open-Meteo** | ✅ Funcional | Datos climáticos | Sin límite |
+| **PVGIS** | ✅ Funcional | Potencial solar | Sin límite |
+| **Datos.gob.es** | ✅ Funcional | Datos oficiales | Sin límite |
+| **AEMET** | ⏳ Token | Clima oficial | Requiere key |
+| **Google Maps** | ⏳ Token | Geocoding premium | Requiere key |
+
+## 🚀 Instalación y Configuración
+
+```bash
+# Configurar entorno virtual
+python3 -m venv venv
+source venv/bin/activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Configurar variables de entorno
+cp .env.example .env
+
+# Inicializar proyecto
+bash init_project.sh
+```
+
+### Variables de Entorno
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| **DB_HOST** | Servidor PostgreSQL | localhost |
+| **DB_PORT** | Puerto base datos | 5432 |
+| **DB_USER** | Usuario PostgreSQL | postgres |
+| **OPENAI_API_KEY** | Clave OpenAI (opcional) | sk-xxxxxxxx |
+
+## 🎯 Casos de Uso
+
+### Comandos Principales
+| Comando | Función | Resultado |
+|---------|---------|-----------|
+| `python pipeline/N0_to_N1.py` | Pipeline N0→N1 | Enriquecimiento datos |
+| `python pipeline/N1_to_N2.py` | Pipeline N1→N2 | Contextualización |
+| `python test/test_security.py` | Pruebas seguridad | 6/6 tests exitosos |
+
+### Estado del Sistema
+| Componente | Estado | Descripción |
+|------------|--------|-------------|
+| **Pipeline N0→N1** | ✅ Producción | Enriquecimiento automático |
+| **MCP Conectores** | ✅ Producción | 28/28 bases conectadas |
+| **Seguridad RGPD** | ✅ Producción | Hashing + TTL |
+| **APIs Externas** | ✅ Funcional | 4/6 operativas |
+| **Tests Automatizados** | ✅ Completado | 100% exitosos |
 
 ---
 
-## Documentación Especializada
+**Documento Confidencial y Propiedad de Energy Green Data.**
 
-- **[Arquitectura del Sistema](docs/README_arquitectura.md)** - 28 bases de datos MCP validadas con 183+ tablas activas
-- **[APIs Externas](docs/README_apis_externas.md)** - Estado y configuración de 8 APIs (4 funcionales, 4 bloqueadas)
-- **[Seguridad de Datos](docs/README_seguridad_datos.md)** - Protección RGPD, hashing y flujos de anonimización
-- **[Actualizaciones Automáticas](docs/README_actualizaciones_automaticas.md)** - Pipeline y scheduling de datos
-
----
-
-## Integración Híbrida con eSCORE
-
-El ecosistema `db_watioverse` se integra con el Motor eSCORE mediante una arquitectura híbrida que separa responsabilidades y optimiza el flujo de datos energéticos:
-
-### Responsabilidades de db_watioverse
-
-- **Pipeline N0→N1**: Transformación automática de datos brutos en datos enriquecidos
-- **Validación de Integridad**: Detección automática de campos faltantes o inconsistentes
-- **Cuestionarios Dinámicos**: Generación inteligente de preguntas para completar datos críticos
-- **Monitoreo Automático**: Procesamiento en tiempo real de nuevos archivos JSON
-
-### Métricas del Sistema - Auditoría MCP Real
-
-| Métrica | Valor MCP | Estado | Descripción |
-|---------|-----------|--------|--------------|
-| **Bases de Datos** | 28/28 | ✅ 100% | Conectadas vía MCP |
-| **Tablas Activas** | 183+ | ✅ OPERATIVO | Inventario completo validado |
+*La información contenida en este documento es de carácter reservado y para uso exclusivo de la organización. Queda prohibida su reproducción, distribución o comunicación pública, total o parcial, sin autorización expresa.*
 | **Pipeline N0→N3** | Funcional | ✅ COMPLETO | Scoring end-to-end |
 | **APIs Funcionales** | 4/8 | ✅ 50% | Open-Meteo, Nominatim, Catastro, PVGIS |
 | **Zonas Climáticas** | 4,087/11,830 | 🔄 35% | En progreso de carga |
