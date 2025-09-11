@@ -1,0 +1,17 @@
+
+============================================================
+📊 REPORTE DE INSERCIÓN N0
+============================================================
+Total archivos procesados: 7
+✅ ARCHIVOS PROCESADOS EXITOSAMENTE:
+  - N0_UNKNOWN_SIN_FECHA_182822.json: 6 tablas (0.03s)
+  - N0_ES0022000001348639QK_20250314_182656.json: 8 tablas (0.01s)
+  - N0_ES0021000005178445GS_20240916_182703.json: 10 tablas (0.01s)
+  - N0_ES0022000008433586LW0F_20250512_182842.json: 10 tablas (0.00s)
+  - N0_ES0022000004051057YP1P_20250116_182711.json: 9 tablas (0.00s)
+  - N0_ES0022000008342444ND1P_20250214_182700.json: 10 tablas (0.01s)
+  - N0_UNKNOWN_SIN_FECHA_182656.json: 4 tablas (0.00s)
+
+⏱️ Tiempo total: 0.07 segundos
+📝 Total registros insertados: 57
+============================================================

@@ -6,7 +6,7 @@
 
 ![Versión](https://img.shields.io/badge/versión-3.0.0-blue)
 ![Estado](https://img.shields.io/badge/estado-producción-green)
-![Bases](https://img.shields.io/badge/bases_de_datos-28-orange)
+![Bases](https://img.shields.io/badge/bases_datos-28-orange)
 
 **Módulo:** db_watioverse  
 **Proyecto interno de Energy Green Data**
@@ -29,8 +29,8 @@ Ecosistema de capas de datos para el procesamiento y análisis de información e
 
 ```mermaid
 graph TD
-    A[N0 Datos Brutos] --> B[Pipeline N0→N1]
-    B --> C[N1 Datos Enriquecidos]
+    A[N0 Datos Brutos] --> B[IndicadoresN1Updater]
+    B --> C[N1 Indicadores Automáticos]
     C --> D[Pipeline N1→N2]
     D --> E[N2 Datos Contextuales]
     E --> F[Pipeline N2→N3]
@@ -56,24 +56,24 @@ graph TD
 ### Capas del Ecosistema
 | Capa | Descripción | Estado | Tablas |
 |------|-------------|--------|--------|
-| **N0** | Datos brutos de facturas | ✅ Activo | 15+ |
-| **N1** | Datos enriquecidos | ✅ Activo | 20+ |
-| **N2** | Datos contextuales | ✅ Activo | 25+ |
-| **N3** | Datos calculados | ✅ Activo | 30+ |
-| **N4** | Datos agregados | ⏳ Desarrollo | 10+ |
-| **N5** | Datos eSCORE | ⏳ Desarrollo | 5+ |
+| **N0** | Datos brutos de facturas | ✅ Producción | 15 tablas |
+| **N1** | Indicadores automáticos + KPIs | ✅ Producción | 20 tablas + indicators (62 KPIs) |
+| **N2** | Datos contextuales + enriquecimiento | ✅ Producción | 15 tablas |
+| **N3** | Datos calculados | ⏳ Desarrollo | En desarrollo |
+| **N4** | Datos agregados | ⏳ Desarrollo | En desarrollo |
+| **N5** | Datos eSCORE | ⏳ Desarrollo | En desarrollo |
 
-### Bases de Datos Conectadas
+### Bases de Datos Conectadas (28 Bases MCP)
 | Base | Función | MCP | Estado |
 |------|---------|-----|--------|
-| **N0-N5** | Pipeline principal | ✅ | Activo |
-| **Ncore** | Datos maestros | ✅ | Activo |
-| **Sistema Eléctrico** | Tarifas y precios | ✅ | Activo |
+| **N0-N5** | Pipeline principal | ✅ | N0-N2 Producción |
+| **Ncore** | Datos maestros (72 tablas) | ✅ | Producción |
+| **Sistema Eléctrico** | Tarifas y precios ESIOS | ✅ | Producción |
 | **Territorio** | Códigos postales | ✅ | Activo |
 | **Comercializadora** | Empresas | ✅ | Activo |
 | **Distribuidora** | Redes | ✅ | Activo |
-| **CAES** | Certificados | ✅ | Activo |
-| **Movilidad** | Vehículos | ✅ | Activo |
+| **eSCORE_*** | Motor puntuación (5 bases) | ✅ | Producción |
+| **Clima/Enriquecimiento** | APIs externas | ✅ | Activo |
 
 ### APIs Integradas
 | API | Estado | Función | Tokens |
@@ -84,6 +84,13 @@ graph TD
 | **Datos.gob.es** | ✅ Funcional | Datos oficiales | Sin límite |
 | **AEMET** | ⏳ Token | Clima oficial | Requiere key |
 | **Google Maps** | ⏳ Token | Geocoding premium | Requiere key |
+
+## 📑 Documentación Especializada
+
+- 🔄 **[Pipeline N0→N1](../docs/pipeline_n0_n1.md)** - Procesamiento automático crítico
+- ⚡ **[IndicadoresN1 KPIs](../docs/indicadores_n1.md)** - Sistema de 62 métricas automáticas
+- 💾 **[Bases de Datos MCP](../docs/bases_datos_mcp.md)** - Documentación completa 28 bases
+- 🏗️ **[DatabaseManager](../docs/database_manager.md)** - Gestor centralizado conexiones
 
 ## 🚀 Instalación y Configuración
 
@@ -115,7 +122,8 @@ bash init_project.sh
 ### Comandos Principales
 | Comando | Función | Resultado |
 |---------|---------|-----------|
-| `python pipeline/N0_to_N1.py` | Pipeline N0→N1 | Enriquecimiento datos |
+| `python pipeline/N0_to_N1.py` | Pipeline N0→N1 (legacy) | Enriquecimiento datos |
+| `python -c "from motor_actualizaciones.updaters.indicadores_n1_updater import IndicadoresN1Updater; u = IndicadoresN1Updater(); u.run()"` | Pipeline N0→N1 (producción) | Indicadores automáticos |
 | `python pipeline/N1_to_N2.py` | Pipeline N1→N2 | Contextualización |
 | `python test/test_security.py` | Pruebas seguridad | 6/6 tests exitosos |
 

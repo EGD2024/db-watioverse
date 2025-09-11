@@ -57,16 +57,16 @@ class N1FileHandler(FileSystemEventHandler):
                 self.processed_files.add(event.src_path)
     
     def _is_n1_file(self, file_path: str) -> bool:
-        """Verifica si un archivo es un JSON N1 válido."""
+        """Verifica si un archivo es un JSON N0 para procesar a N1."""
         path = Path(file_path)
         
         # Verificar extensión
         if path.suffix.lower() != '.json':
             return False
         
-        # Verificar patrón de nombre N1
+        # Verificar patrón de nombre N0 (archivos de entrada para N1)
         name = path.name.lower()
-        if not (name.startswith('n1_') or '_n1.' in name):
+        if not name.startswith('n0_'):
             return False
         
         # Verificar que no sea archivo temporal
@@ -130,29 +130,29 @@ class N1Monitor:
             self._mover_archivo_error(archivo_path)
     
     def _validar_archivo_n1(self, archivo_path: str) -> bool:
-        """Valida que un archivo sea un JSON N1 correcto."""
+        """Valida que un archivo sea un JSON N0 correcto para procesar a N1."""
         try:
             with open(archivo_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Verificar estructura mínima N1
-            required_fields = ['cups', 'cliente', 'direccion']
+            # Verificar estructura mínima N0
+            required_fields = ['cups', 'cliente']
             if not all(field in data for field in required_fields):
-                logger.warning(f"Archivo N1 sin campos requeridos: {archivo_path}")
+                logger.warning(f"Archivo N0 sin campos requeridos: {archivo_path}")
                 return False
             
-            # Verificar metadatos N1
-            if '_metadata_n1' not in data:
-                logger.warning(f"Archivo sin metadatos N1: {archivo_path}")
+            # Verificar metadatos N0
+            if '_metadata' not in data:
+                logger.warning(f"Archivo sin metadatos N0: {archivo_path}")
                 # Aún es válido, solo advertencia
             
             return True
             
         except json.JSONDecodeError:
-            logger.error(f"Archivo N1 con JSON inválido: {archivo_path}")
+            logger.error(f"Archivo N0 con JSON inválido: {archivo_path}")
             return False
         except Exception as e:
-            logger.error(f"Error validando archivo N1 {archivo_path}: {e}")
+            logger.error(f"Error validando archivo N0 {archivo_path}: {e}")
             return False
     
     def _mover_archivo_procesado(self, archivo_path: str):
@@ -207,12 +207,12 @@ class N1Monitor:
             logger.info("📭 No hay archivos N1 existentes para procesar")
     
     def _is_n1_file(self, file_path: str) -> bool:
-        """Verifica si un archivo es un JSON N1 válido."""
+        """Verifica si un archivo es un JSON N0 para procesar a N1."""
         path = Path(file_path)
         name = path.name.lower()
         
         return (path.suffix.lower() == '.json' and 
-                (name.startswith('n1_') or '_n1.' in name) and
+                name.startswith('n0_') and
                 not name.startswith('.') and 
                 not name.endswith('.tmp'))
     

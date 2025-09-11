@@ -41,7 +41,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Directorio de archivos N0
-DATA_OUT_DIR = Path(__file__).parent.parent.parent.parent.parent
+DATA_OUT_DIR = Path("/Users/vagalumeenergiamovil/PROYECTOS/Entorno/Data_out")
 
 @dataclass
 class ResultadoInsercion:

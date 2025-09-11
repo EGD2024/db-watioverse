@@ -79,35 +79,26 @@ def main():
         # Consulta principal para obtener los datos
         consulta = f"""
             WITH calendario AS (
-                SELECT fecha, hora_time as hora, periodo_tarifa
+                SELECT fecha, CAST(hora AS INTEGER) as hora, periodo_tarifa
                 FROM {calendario_tabla}
                 WHERE fecha >= %s AND fecha <= %s
             ),
             energia AS (
-                SELECT fecha, hora, precio_energia
+                SELECT fecha, CAST(periodo AS INTEGER) as hora, 
+                       COALESCE(precio_final, precio_energia) as precio_energia
                 FROM omie_precios
                 WHERE fecha >= %s AND fecha <= %s
                   AND zona::text = 'ES'
             ),
             peajes AS (
-                SELECT DISTINCT ON (periodo)
-                    LOWER(REPLACE(componente, 'consumo_peaje_', '')) as periodo,
-                    precio as precio_peaje,
-                    fecha_inicio,
-                    COALESCE(fecha_fin, '9999-12-31'::date) as fecha_fin
-                FROM precio_regulado_boe
-                WHERE componente LIKE 'consumo_peaje_%'
-                ORDER BY periodo, fecha_inicio DESC
+                SELECT 'p1' as periodo, 0.044027 as precio_peaje UNION ALL
+                SELECT 'p2' as periodo, 0.025596 as precio_peaje UNION ALL
+                SELECT 'p3' as periodo, 0.018669 as precio_peaje
             ),
             cargos AS (
-                SELECT DISTINCT ON (periodo)
-                    LOWER(REPLACE(componente, 'consumo_cargo_', '')) as periodo,
-                    precio as precio_cargo,
-                    fecha_inicio,
-                    COALESCE(fecha_fin, '9999-12-31'::date) as fecha_fin
-                FROM precio_regulado_boe
-                WHERE componente LIKE 'consumo_cargo_%'
-                ORDER BY periodo, fecha_inicio DESC
+                SELECT 'p1' as periodo, 0.062012 as precio_cargo UNION ALL
+                SELECT 'p2' as periodo, 0.003661 as precio_cargo UNION ALL
+                SELECT 'p3' as periodo, 0.003661 as precio_cargo
             )
             SELECT 
                 c.fecha,
@@ -122,9 +113,7 @@ def main():
             FROM calendario c
             LEFT JOIN energia e ON c.fecha = e.fecha AND c.hora = e.hora
             LEFT JOIN peajes p ON LOWER(c.periodo_tarifa) = p.periodo
-                AND c.fecha BETWEEN p.fecha_inicio AND p.fecha_fin
             LEFT JOIN cargos cr ON LOWER(c.periodo_tarifa) = cr.periodo
-                AND c.fecha BETWEEN cr.fecha_inicio AND cr.fecha_fin
             ORDER BY c.fecha, c.hora
         """
         
@@ -149,6 +138,16 @@ def main():
             cur.execute("SELECT * FROM omie_precios WHERE zona='ES' LIMIT 1")
             sample_omie = cur.fetchone()
             print(f"   Columnas omie: {list(sample_omie.keys()) if sample_omie else 'N/A'}")
+            
+            # Debug: probar consulta simplificada
+            print("   Probando consulta simplificada...")
+            cur.execute(f"""
+                SELECT COUNT(*) FROM {calendario_tabla} c
+                LEFT JOIN omie_precios o ON c.fecha = o.fecha AND CAST(c.hora AS INTEGER) = CAST(o.periodo AS INTEGER)
+                WHERE c.fecha >= %s AND c.fecha <= %s AND o.zona = 'ES'
+            """, (FECHA_INICIO, FECHA_FIN))
+            test_count = cur.fetchone()
+            print(f"   Registros que harían match: {test_count[0] if test_count else 'N/A'}")
             
             raise
         
@@ -176,13 +175,13 @@ def main():
                     precio_total_pvpc = EXCLUDED.precio_total_pvpc
                 RETURNING (xmax = 0) AS inserted
             """, (
-                row['fecha'], row['hora'], row['periodo_tarifa'],
+                row['fecha'], f"{row['hora']:02d}:00:00", row['periodo_tarifa'],
                 row['precio_energia'], row['precio_peajes'], 
                 row['precio_cargos'], row['precio_total_pvpc']
             ))
             
             result = cur.fetchone()
-            if result and result['inserted']:
+            if result and len(result) > 0 and result[0]:
                 inserted += 1
             else:
                 updated += 1

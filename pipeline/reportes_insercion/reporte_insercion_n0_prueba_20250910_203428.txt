@@ -1,0 +1,12 @@
+
+============================================================
+📊 REPORTE DE INSERCIÓN N0
+============================================================
+Total archivos procesados: 2
+✅ ARCHIVOS PROCESADOS EXITOSAMENTE:
+  - N0_UNKNOWN_SIN_FECHA_203330.json: 14 tablas (0.00s)
+  - N0_ES0022000001348639QK_20250314_203351.json: 14 tablas (0.00s)
+
+⏱️ Tiempo total: 0.00 segundos
+📝 Total registros insertados: 28
+============================================================

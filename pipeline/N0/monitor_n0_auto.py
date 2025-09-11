@@ -1,4 +1,15 @@
 #!/usr/bin/env python3
+# ==========================================
+# MIGRADO AL SISTEMA CENTRALIZADO
+# ==========================================
+# Este script ha sido migrado al Motor de Actualizaciones Centralizado
+# Nuevo sistema: /motores/motor_actualizaciones/
+# Scheduler unificado: core/unified_scheduler.py
+# Configuración: config/master_config.yaml
+# 
+# Para ejecutar: python master_main.py --category watioverse
+# Para scheduling: python core/unified_scheduler.py
+# ==========================================
 # -*- coding: utf-8 -*-
 """
 Monitor Automático N0

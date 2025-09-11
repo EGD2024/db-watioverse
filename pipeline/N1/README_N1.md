@@ -129,6 +129,35 @@ graph LR
 | **`recomendaciones_ahorro`** | TEXT[] | Recomendaciones personalizadas |
 | **`percentil_consumo_sector`** | DECIMAL | Benchmarking sectorial |
 
+### 📊 Tabla de Indicadores Automáticos (Producción)
+
+La tabla **`indicators`** contiene **62 campos** calculados automáticamente desde los datos N0:
+
+| Campo | Tipo | Propósito |
+|-------|------|-----------|
+| **`id_indicator`** | SERIAL | Identificador único del indicador |
+| **`id_factura`** | VARCHAR | ID de factura origen |
+| **`id_cliente`** | VARCHAR | ID de cliente |
+| **`cups`** | VARCHAR | Código CUPS |
+| **`año`** | INTEGER | Año de la factura |
+| **`consumo_medido_min_p1-p6`** | DECIMAL | Consumo medido mínimo por período |
+| **`consumo_medido_max_p1-p6`** | DECIMAL | Consumo medido máximo por período |
+| **`consumo_facturado_min_p1-p6`** | DECIMAL | Consumo facturado mínimo por período |
+| **`consumo_facturado_max_p1-p6`** | DECIMAL | Consumo facturado máximo por período |
+| **`potencia_facturada_min_p1-p6`** | DECIMAL | Potencia facturada mínima por período |
+| **`potencia_facturada_max_p1-p6`** | DECIMAL | Potencia facturada máxima por período |
+| **`created_at`** | TIMESTAMP | Fecha de creación automática |
+| **`metadata`** | JSONB | Metadatos del cálculo |
+
+### 🤖 Cálculo Automático de Indicadores
+
+El **IndicadoresN1Updater** procesa automáticamente:
+- **Origen**: Tablas N0 (invoice, client, supply_point, contract)
+- **Fallback**: Archivos JSON N0 si BD no disponible
+- **Frecuencia**: Automático al detectar nuevos datos N0
+- **Validación**: 80% de éxito mínimo requerido
+- **Pipeline**: N0 → BD N0 → Indicadores N1 → BD N1
+
 ---
 
 ## 🔄 Separación de Datos
@@ -180,32 +209,27 @@ graph TD
 
 ## 🔄 Flujo de Datos
 
-### Pipeline Completo N0 → N1
+### Pipeline Completo N0 → N1 (Automático)
 
 ```mermaid
 sequenceDiagram
-    participant N0 as Base Datos N0
-    participant P as Proceso Limpieza
-    participant N1B as N1 Base
-    participant E as Motor Enriquecimiento
-    participant N1M as N1 Metrics
+    participant JSON as Archivos JSON N0
+    participant BD0 as Base Datos N0
+    participant IND as IndicadoresN1Updater
+    participant BD1 as Base Datos N1
     participant S as Sistema eSCORE
     
-    N0->>P: Datos brutos + metadatos
-    P->>P: Eliminar metadatos extracción
-    P->>N1B: Datos energéticos limpios
+    JSON->>BD0: Inserción automática (insert_N0.py)
+    BD0->>IND: Consulta tablas (invoice, client, supply_point, contract)
+    IND->>IND: Cálculo 57 indicadores por factura
+    IND->>BD1: Inserción tabla indicators (62 campos)
     
-    N1B->>E: Datos base para cálculos
-    E->>E: Calcular KPIs y métricas
-    E->>N1M: Sustainability metrics
-    E->>N1M: Analytics & ratios
+    Note over JSON: Archivos N0_*.json detectados
+    Note over BD0: 14 tablas N0 pobladas
+    Note over IND: Fallback a JSON si BD no disponible
+    Note over BD1: Indicadores listos para análisis
     
-    N1B->>S: Datos base energéticos
-    N1M->>S: Métricas enriquecidas
-    
-    Note over P: Filtrado de campos confianza
-    Note over E: Cálculos de sostenibilidad y eficiencia
-    Note over S: Datos listos para eSCORE
+    BD1->>S: Datos enriquecidos para eSCORE
 ```
 
 ### Transformaciones Clave
@@ -249,6 +273,39 @@ psql -d db_N1 -f RECREAR_N1_UNIFICADO.sql
 
 ✅ 8 índices de optimización
 ✅ Referencias y constraints
+```
+
+## 🚀 Ejecución Automática de Indicadores
+
+### Comandos Principales (Producción)
+
+```bash
+# Activar entorno motor actualizaciones
+cd /Users/vagalumeenergiamovil/PROYECTOS/Entorno/motores/motor_actualizaciones
+source venv/bin/activate
+
+# Ejecutar cálculo automático de indicadores N1
+python -c "from updaters.indicadores_n1_updater import IndicadoresN1Updater; u = IndicadoresN1Updater(); print('Resultado:', u.run())"
+
+# Verificar datos insertados en BD N1
+python -c "
+from core.db_manager import db_manager
+with db_manager.get_connection('N1') as conn:
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT COUNT(*) FROM indicators;')
+        print(f'Indicadores en BD N1: {cursor.fetchone()[0]}')
+"
+```
+
+### Comandos Legacy (db_watioverse)
+
+```bash
+# Activar entorno db_watioverse
+cd /Users/vagalumeenergiamovil/PROYECTOS/Entorno/motores/db_watioverse
+source .venv/bin/activate
+
+# Pipeline completo N0 → N1 (método legacy)
+python -m pipeline.N1.process_n1 --input-dir ../../../Data_out --output-dir ../../../Data_out
 ```
 
 ### Validación Post-Creación

@@ -332,14 +332,27 @@ class N1Inserter:
         }
     
     def mapear_datos_sustainability_base(self, datos_json: dict) -> Dict[str, Any]:
-        """Mapea datos para tabla sustainability_base (datos directos de factura)."""
+        """Mapea datos para tabla sustainability_base (datos directos de factura).
+        
+        NOTA: Unificado con arquitectura híbrida LLM + automejora.
+        Los campos se mapean desde el módulo 'sostenibilidad' extraído por LLM
+        y validado/enriquecido por automejora_sostenibilidad.py
+        """
+        # Buscar datos en el módulo 'sostenibilidad' (arquitectura híbrida)
+        sustainability_data = self.extraer_valor_seguro(datos_json, 'sostenibilidad', {})
+        
         return {
             'cups': self.extraer_valor_seguro(datos_json, 'cups'),
-            'mix_energetico_renovable_pct': self.extraer_valor_seguro(datos_json, 'mix_energetico_renovable_pct'),
-            'mix_energetico_cogeneracion_pct': self.extraer_valor_seguro(datos_json, 'mix_energetico_cogeneracion_pct'),
-            'mix_energetico_residuos_pct': self.extraer_valor_seguro(datos_json, 'mix_energetico_residuos_pct'),
-            'emisiones_co2_kg_kwh': self.extraer_valor_seguro(datos_json, 'emisiones_co2_kg_kwh'),
-            'residuos_radiactivos_mg_kwh': self.extraer_valor_seguro(datos_json, 'residuos_radiactivos_mg_kwh')
+            # Mapeo unificado con campos estándar de sostenibilidad
+            'energia_origen_renovable': self.extraer_valor_seguro(sustainability_data, 'energia_origen_renovable'),
+            'energia_origen_nuclear': self.extraer_valor_seguro(sustainability_data, 'energia_origen_nuclear'),
+            'energia_origen_carbon': self.extraer_valor_seguro(sustainability_data, 'energia_origen_carbon'),
+            'energia_origen_cc_gas_natural': self.extraer_valor_seguro(sustainability_data, 'energia_origen_cc_gas_natural'),
+            'energia_origen_cogeneracion_alta_eficiencia': self.extraer_valor_seguro(sustainability_data, 'energia_origen_cogeneracion_alta_eficiencia'),
+            'energia_origen_fuel_gas': self.extraer_valor_seguro(sustainability_data, 'energia_origen_fuel_gas'),
+            'energia_origen_otras_no_renovables': self.extraer_valor_seguro(sustainability_data, 'energia_origen_otras_no_renovables'),
+            'emisiones_co2_equivalente': self.extraer_valor_seguro(sustainability_data, 'emisiones_co2_equivalente'),
+            'letra_escala_medioambiental': self.extraer_valor_seguro(sustainability_data, 'letra_escala_medioambiental')
         }
     
     def mapear_datos_sustainability_metrics(self, datos_json: dict) -> Dict[str, Any]:

@@ -230,9 +230,29 @@ graph TD
 
 La capa N0 alimenta directamente:
 
-- **N1 (Enriquecimiento)**: Normalización y cálculos derivados
+- **N1 (Indicadores Automáticos)**: IndicadoresN1Updater calcula 57 indicadores desde tablas N0
 - **N2 (Análisis)**: Agregaciones y métricas eSCORE
 - **Sistema eSCORE**: Indicadores IC, IP, IE, IT, IR, IF
+
+### 📊 Pipeline Automático N0 → N1 (Producción)
+
+```mermaid
+sequenceDiagram
+    participant JSON as Archivos JSON N0
+    participant BD0 as Base Datos N0
+    participant IND as IndicadoresN1Updater
+    participant BD1 as Base Datos N1
+    
+    JSON->>BD0: insert_N0.py (inserción real)
+    BD0->>IND: Consulta tablas (invoice, client, supply_point, contract)
+    IND->>IND: Cálculo automático 57 indicadores
+    IND->>BD1: Inserción tabla indicators (62 campos)
+    
+    Note over JSON: Archivos N0_*.json detectados
+    Note over BD0: 14 tablas N0 pobladas
+    Note over IND: Fallback a JSON si BD no disponible
+    Note over BD1: Indicadores listos para eSCORE
+```
 
 ## 🚀 Uso del Sistema de Monitoreo
 
@@ -243,6 +263,24 @@ La capa N0 alimenta directamente:
 source venv/bin/activate
 cd N0
 python3 monitor_n0_auto.py
+```
+
+### Ejecutar Pipeline Completo N0 → N1
+
+```bash
+# Método principal: Motor de Actualizaciones
+cd /Users/vagalumeenergiamovil/PROYECTOS/Entorno/motores/motor_actualizaciones
+source venv/bin/activate
+python -c "from updaters.indicadores_n1_updater import IndicadoresN1Updater; u = IndicadoresN1Updater(); print('Resultado:', u.run())"
+
+# Verificar inserción en BD N1
+python -c "
+from core.db_manager import db_manager
+with db_manager.get_connection('N1') as conn:
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT COUNT(*) FROM indicators;')
+        print(f'Indicadores calculados: {cursor.fetchone()[0]}')
+"
 ```
 
 ### Ejemplo de Procesamiento Automático

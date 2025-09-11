@@ -108,6 +108,9 @@ class DatabaseManager:
             'simulador': {**self.base_config, 'database': f"db_{os.getenv('DB_SIMULADOR', 'simulador')}"},
             'rag': {**self.base_config, 'database': f"db_{os.getenv('DB_RAG', 'rag')}"},
             'memoria': {**self.base_config, 'database': f"db_{os.getenv('DB_MEMORIA', 'memoria')}"},
+            
+            # Ncore - Base de datos de perfiles y configuraciones centrales
+            'Ncore': {**self.base_config, 'database': f"db_{os.getenv('DB_NCORE', 'Ncore')}"},
         }
         
         # NO inicializar pools automáticamente - usar inicialización bajo demanda
